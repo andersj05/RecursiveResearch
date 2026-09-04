@@ -343,6 +343,28 @@ describe('sequential research harness', () => {
     expect((await store.run(run.id)).harness?.answer).toBe('Europe');
     expect(vi.mocked(provider.executeTurn).mock.calls[1]?.[0].prompt).toContain('Europe');
   });
+  it('enforces the round budget even when every review requests more research', async () => {
+    const { coordinator, store, chat, provider } = await fixture(
+      scripted([
+        { summary: 'Clear', question: null },
+        { questions: ['What is known?'] },
+        { summary: 'No evidence', sources: [] },
+        { summary: 'Need sources', gaps: ['Missing evidence'] },
+        { summary: 'Still no evidence', sources: [] },
+        { summary: 'Need sources', gaps: ['Missing evidence'] },
+        '# Limitations\nNo supporting evidence was found.',
+      ]),
+    );
+    const run = await coordinator.start(chat.id, research);
+    await vi.waitFor(async () => expect((await store.run(run.id)).status).toBe('completed'), {
+      timeout: 5000,
+    });
+    expect(provider.executeTurn).toHaveBeenCalledTimes(7);
+    expect((await store.run(run.id)).harness?.round).toBe(2);
+    expect((await store.run(run.id)).harness?.stopReason).toContain('round limit');
+    expect((await store.run(run.id)).harness?.gaps).toEqual(['Missing evidence']);
+  });
+
   it('fails invalid output without leaking raw structured text or starting another stage', async () => {
     const { coordinator, store, chat, provider } = await fixture(
       scripted(['invalid stage output']),

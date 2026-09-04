@@ -322,7 +322,7 @@ export class RunCoordinator {
         status: 'running',
         turnId: null,
         harness: state,
-        summary: `${state.stage === 'gather' ? `Gather � round ${state.round}` : state.stage.charAt(0).toUpperCase() + state.stage.slice(1)} started.`,
+        summary: `${state.stage === 'gather' ? `Gather - round ${state.round}` : state.stage.charAt(0).toUpperCase() + state.stage.slice(1)} started.`,
       });
       await worker.queue;
       if (worker.failure) throw worker.failure;
@@ -396,7 +396,7 @@ export class RunCoordinator {
       worker.text = state.steps
         .map(
           (step) =>
-            `### ${step.stage.charAt(0).toUpperCase() + step.stage.slice(1)}${step.round ? ` � round ${step.round}` : ''}\n\n${step.summary}`,
+            `### ${step.stage.charAt(0).toUpperCase() + step.stage.slice(1)}${step.round ? ` - round ${step.round}` : ''}\n\n${step.summary}`,
         )
         .join('\n\n');
       if (state.stage === 'scope' && state.question) {

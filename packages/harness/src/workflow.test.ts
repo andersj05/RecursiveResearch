@@ -88,6 +88,10 @@ describe('research graph routing', () => {
       ),
     ).toThrow();
   });
+  it('omits unsupported URI format from provider schemas while validating URLs locally', () => {
+    expect(JSON.stringify(stageOutputSchema('gather'))).not.toContain('"format":"uri"');
+  });
+
   it('provides output schemas for all structured graph nodes', () => {
     for (const stage of researchGraph)
       if (stage.id !== 'report')

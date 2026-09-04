@@ -10,7 +10,9 @@ import { api, describeError } from './lib/api';
 
 export function App() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [view, setView] = useState<'workspace' | 'configuration' | 'harness'>(window.location.hash.startsWith('#harness') ? 'harness' : 'workspace');
+  const [view, setView] = useState<'workspace' | 'configuration' | 'harness'>(
+    window.location.hash.startsWith('#harness') ? 'harness' : 'workspace',
+  );
   useEffect(() => {
     if (view === 'harness') window.history.replaceState(null, '', '#harness');
     else if (window.location.hash.startsWith('#harness'))

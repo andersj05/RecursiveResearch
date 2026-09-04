@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { type HarnessState } from '@recursive-research/contracts';
 import { WorkspaceStore } from './storage.js';
 
 const input = {
@@ -123,7 +124,8 @@ describe('durable chat and research runs', () => {
       await other.createProject('Shared research', project.folderPath);
     }
     const worker = `
-      import { WorkspaceStore } from './apps/server/src/storage.ts';
+      import { type HarnessState } from '@recursive-research/contracts';
+import { WorkspaceStore } from './apps/server/src/storage.ts';
       const store = new WorkspaceStore(process.env.RR_TEST_REGISTRY);
       await store.initialize();
       try {
@@ -246,4 +248,52 @@ describe('durable chat and research runs', () => {
       code: 'UNSAFE_PATH',
     });
   });
+});
+
+it('keeps waiting checkpoints after owner exit and atomically claims a single answer', async () => {
+  const { store, chat, registry, documentPath } = await fixture();
+  const state: HarnessState = {
+    version: 1,
+    stage: 'scope',
+    brief: 'Research',
+    maxRounds: 2,
+    maxSources: 3,
+    requirePrimarySources: true,
+    instructions: '',
+    round: 0,
+    question: 'Which region?',
+    answer: null,
+    plan: [],
+    sources: [],
+    gaps: [],
+    steps: [],
+    stopReason: null,
+  };
+  const run = await store.createRun(chat.id, {
+    ...input,
+    mode: 'research',
+    harness: { maxRounds: 2, maxSources: 3 },
+    harnessState: state,
+  });
+  await store.updateRun(run.id, { status: 'waiting', content: 'Which region?' });
+  const document = JSON.parse(await readFile(documentPath, 'utf8'));
+  document.runs[0].owner.pid = 2147483647;
+  await writeFile(documentPath, JSON.stringify(document));
+  const reopened = new WorkspaceStore(registry);
+  await reopened.initialize();
+  expect((await reopened.run(run.id)).status).toBe('waiting');
+  await expect(reopened.createRun(chat.id, input)).rejects.toMatchObject({ code: 'RUN_ACTIVE' });
+  const other = new WorkspaceStore(registry);
+  await other.initialize();
+  const answers = await Promise.allSettled([
+    reopened.answerHarness(run.id, 'Europe'),
+    other.answerHarness(run.id, 'Asia'),
+  ]);
+  expect(answers.filter((answer) => answer.status === 'fulfilled')).toHaveLength(1);
+  expect((await reopened.run(run.id)).harness?.stage).toBe('plan');
+  expect(
+    (await reopened.chat(chat.id)).messages.filter((message) =>
+      ['Europe', 'Asia'].includes(message.content),
+    ),
+  ).toHaveLength(1);
 });

@@ -79,5 +79,12 @@ export function stageOutputSchema(stage: Exclude<HarnessStage, 'report'>) {
       gather: gatherOutputSchema,
       review: reviewOutputSchema,
     }[stage],
+    {
+      override: ({ jsonSchema }) => {
+        // Codex structured outputs reject JSON Schema's `uri` format. Keep URL
+        // validation at our boundary while sending the supported string shape.
+        if (jsonSchema.format === 'uri') delete jsonSchema.format;
+      },
+    },
   );
 }
