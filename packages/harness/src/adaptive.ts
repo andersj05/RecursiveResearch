@@ -114,7 +114,7 @@ export function admitDirections(
       state.orchestration.rejectedDirections++;
       continue;
     }
-    const depth = parent && isResearchTask(parent) ? parent.depth + 1 : Math.max(1, state.round);
+    const depth = parent && isResearchTask(parent) ? parent.depth + 1 : 1;
     if (
       depth > state.orchestration.maxDepth ||
       state.orchestration.tasks.filter(isResearchTask).length >= state.orchestration.maxTasks
@@ -278,6 +278,12 @@ export function investigationPrompt(state: AdaptiveHarnessState, task: AgentTask
     stopReason: state.stopReason,
   };
   while (JSON.stringify(context).length > 180000 && context.evidence.length) context.evidence.pop();
+  // Keep full user instructions where possible; reduce historical task summaries first.
+  if (JSON.stringify(context).length > 180000)
+    for (const assignment of context.assignments)
+      assignment.summary = assignment.summary.slice(0, 100);
+  if (JSON.stringify(context).length > 180000)
+    context.answer = context.answer?.slice(0, 20000) ?? null;
   context.contextSourceCount = context.evidence.length;
   return JSON.stringify(context);
 }

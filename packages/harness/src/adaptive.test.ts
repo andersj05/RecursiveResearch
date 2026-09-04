@@ -126,4 +126,21 @@ describe('adaptive research policy', () => {
     expect(prompt.retainedSourceCount).toBe(120);
     expect(state.sources).toHaveLength(120);
   });
+  it('bounds maximum-sized user context and permits new root questions at later cycles', () => {
+    const state = initial();
+    state.brief = 'b'.repeat(50000);
+    state.answer = 'a'.repeat(50000);
+    state.instructions = 'i'.repeat(20000);
+    state.orchestration.steering = Array.from({ length: 20 }, () => 'g'.repeat(4000));
+    state.orchestration.maxTasks = 48;
+    state.round = 6;
+    for (let i = 0; i < 48; i++)
+      admitDirections(state, [direction(String(i) + 'q'.repeat(590))], now);
+    for (const task of state.orchestration.tasks) task.summary = 's'.repeat(2000);
+    expect(state.orchestration.tasks).toHaveLength(48);
+    expect(state.orchestration.tasks.every((t) => t.depth === 1)).toBe(true);
+    const task = createTask(state, 'synthesizer', 'Review', now);
+    expect(investigationPrompt(state, task).length).toBeLessThan(200000);
+    expect(state.answer).toHaveLength(50000);
+  });
 });

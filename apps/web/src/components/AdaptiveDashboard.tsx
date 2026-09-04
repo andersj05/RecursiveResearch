@@ -18,6 +18,11 @@ export function AdaptiveDashboard({ state }: { state: AdaptiveHarnessState }) {
     o.tasks.find((task) => task.status === 'running') ??
     o.tasks.at(-1);
   const calls = o.toolCalls.filter((call) => filter === 'all' || call.taskId === filter);
+  const children = (parentId: string | null): AgentTask[] =>
+    o.tasks
+      .filter((task) => task.parentId === parentId)
+      .flatMap((task) => [task, ...children(task.id)]);
+  const tree = children(null);
   const active = o.tasks.filter((t) => t.status === 'running').length;
   const pending = o.tasks.filter((t) => ['queued', 'pending'].includes(t.status)).length;
   return (
@@ -53,7 +58,7 @@ export function AdaptiveDashboard({ state }: { state: AdaptiveHarnessState }) {
         <div className="agent-workbench">
           <div className="agent-tree" aria-label="Delegated assignments">
             {o.tasks.length ? (
-              o.tasks.map((task) => (
+              tree.map((task) => (
                 <button
                   type="button"
                   key={task.id}
@@ -140,7 +145,7 @@ export function AdaptiveDashboard({ state }: { state: AdaptiveHarnessState }) {
                           turnId: selected.turnId,
                           ...selected.request,
                           outputSchema: selected.request.outputSchema
-                            ? JSON.parse(selected.request.outputSchema)
+                            ? readSchema(selected.request.outputSchema)
                             : null,
                         },
                         null,
@@ -259,4 +264,12 @@ export function AdaptiveDashboard({ state }: { state: AdaptiveHarnessState }) {
       )}
     </section>
   );
+}
+
+function readSchema(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
 }

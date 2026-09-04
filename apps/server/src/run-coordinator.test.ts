@@ -587,4 +587,125 @@ describe('adaptive delegated research coordination', () => {
     expect(saved.orchestration.tasks.find((t) => t.question === 'B')?.status).toBe('failed');
     expect(saved.gaps).toEqual(['B failed']);
   });
+  it('persists clarification across restart and includes the answer in delegated prompts', async () => {
+    const first = await fixture(async () => ({
+      threadId: 'planner',
+      turnId: 'planner',
+      status: 'completed',
+      text: JSON.stringify({
+        summary: 'Choose scope',
+        question: 'Which region?',
+        directions: [direction('Regional evidence')],
+      }),
+    }));
+    const run = await first.coordinator.start(first.chat.id, adaptiveInput);
+    await vi.waitFor(async () => expect((await first.store.run(run.id)).status).toBe('waiting'), {
+      timeout: 5000,
+    });
+    expect(first.coordinator.runtime().active).toBe(0);
+    await first.coordinator.close();
+    const execute = vi.fn<Execute>(async (turn) => {
+      const context = JSON.parse(turn.prompt);
+      expect(context.answer).toBe('Europe');
+      const role = context.assignment.role;
+      expect(role).not.toBe('planner');
+      const output =
+        role === 'researcher'
+          ? { summary: 'Evidence', sources: [source('Europe')], leads: [], uncertainties: [] }
+          : role === 'synthesizer'
+            ? {
+                summary: 'Supported',
+                gaps: [],
+                contradictions: [],
+                sufficient: true,
+                directions: [],
+              }
+            : 'Concise findings.';
+      return {
+        threadId: 'resumed',
+        turnId: role,
+        status: 'completed',
+        text: typeof output === 'string' ? output : JSON.stringify(output),
+      };
+    });
+    const next = new RunCoordinator(
+      first.store,
+      { ...first.provider, executeTurn: execute },
+      () => {},
+    );
+    coordinators.push(next);
+    await next.answer(run.id, 'Europe');
+    await vi.waitFor(async () => expect((await first.store.run(run.id)).status).toBe('completed'), {
+      timeout: 5000,
+    });
+    expect(execute).toHaveBeenCalledTimes(3);
+  });
+  it('aborts sibling turns immediately on an infrastructure failure', async () => {
+    let release!: () => void;
+    const siblingStarted = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let aborted = false;
+    const { coordinator, store, chat } = await fixture(async (turn, emit, signal) => {
+      const task = JSON.parse(turn.prompt).assignment;
+      if (task.role === 'planner')
+        return {
+          threadId: 'planner',
+          turnId: 'planner',
+          status: 'completed',
+          text: JSON.stringify({
+            summary: 'Plan',
+            question: null,
+            directions: [direction('A'), direction('B')],
+          }),
+        };
+      if (task.question === 'A') {
+        await siblingStarted;
+        throw new CodexProviderError('NOT_SIGNED_IN', 'Connect your Codex subscription.');
+      }
+      release();
+      try {
+        return await heldTurn(turn, emit, signal);
+      } finally {
+        aborted = !!signal?.aborted;
+      }
+    });
+    const run = await coordinator.start(chat.id, adaptiveInput);
+    await vi.waitFor(async () => expect((await store.run(run.id)).status).toBe('failed'), {
+      timeout: 5000,
+    });
+    expect(aborted).toBe(true);
+    expect((await store.run(run.id)).error).toContain('Connect your Codex');
+    expect(coordinator.runtime().active).toBe(0);
+  });
+  it('saves steering for future assignments and sends it to every active child', async () => {
+    let active = 0;
+    const { coordinator, store, chat, provider } = await fixture(async (turn, emit, signal) => {
+      const task = JSON.parse(turn.prompt).assignment;
+      if (task.role === 'planner')
+        return {
+          threadId: 'planner',
+          turnId: 'planner',
+          status: 'completed',
+          text: JSON.stringify({
+            summary: 'Plan',
+            question: null,
+            directions: [direction('A'), direction('B')],
+          }),
+        };
+      active++;
+      return heldTurn(turn, emit, signal);
+    });
+    const run = await coordinator.start(chat.id, adaptiveInput);
+    await vi.waitFor(() => expect(active).toBe(2), { timeout: 5000 });
+    await coordinator.steer(run.id, 'Prioritize original studies.');
+    expect(provider.steerTurn).toHaveBeenCalledTimes(2);
+    const state = (await store.run(run.id)).harness;
+    if (state?.version !== 2) throw new Error('Expected adaptive');
+    expect(state.orchestration.steering).toEqual(['Prioritize original studies.']);
+    expect((await store.chat(chat.id)).messages.at(-1)?.content).toBe(
+      'Prioritize original studies.',
+    );
+    await coordinator.cancel(run.id);
+  });
 });

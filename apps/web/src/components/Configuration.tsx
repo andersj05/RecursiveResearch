@@ -323,7 +323,7 @@ export function Configuration({
             <summary>Advanced</summary>
             <div className="numeric-fields">
               <label className="field">
-                <span>Concurrent jobs</span>
+                <span>Concurrent jobs / turns</span>
                 <input
                   type="number"
                   min={1}
@@ -334,7 +334,7 @@ export function Configuration({
                 />
               </label>
               <label className="field">
-                <span>Sources per research job</span>
+                <span>Single-turn source guidance</span>
                 <input
                   type="number"
                   min={1}

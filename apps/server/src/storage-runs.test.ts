@@ -5,7 +5,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { type HarnessState } from '@recursive-research/contracts';
+import {
+  defaultAdaptiveOptions,
+  defaultHarnessConfig,
+  type HarnessState,
+} from '@recursive-research/contracts';
+import { createAdaptiveState, createTask } from '@recursive-research/harness';
 import { WorkspaceStore } from './storage.js';
 
 const input = {
@@ -295,4 +300,47 @@ it('keeps waiting checkpoints after owner exit and atomically claims a single an
       ['Europe', 'Asia'].includes(message.content),
     ),
   ).toHaveLength(1);
+});
+
+it('interrupts active adaptive assignments on owner exit and cancels a waiting frontier', async () => {
+  const { store, chat, documentPath, registry } = await fixture();
+  const state = createAdaptiveState('Research', defaultAdaptiveOptions, defaultHarnessConfig);
+  createTask(state, 'researcher', 'Investigate', new Date().toISOString()).status = 'running';
+  createTask(state, 'skeptic', 'Check evidence', new Date().toISOString()).status = 'queued';
+  const run = await store.createRun(chat.id, {
+    ...input,
+    mode: 'research',
+    harness: defaultAdaptiveOptions,
+    harnessState: state,
+  });
+  await store.updateRun(run.id, { status: 'running' });
+  const document = JSON.parse(await readFile(documentPath, 'utf8'));
+  document.runs[0].owner.pid = 2147483647;
+  await writeFile(documentPath, JSON.stringify(document));
+  const reopened = new WorkspaceStore(registry);
+  await reopened.initialize();
+  const interrupted = await reopened.run(run.id);
+  expect(interrupted.status).toBe('interrupted');
+  if (interrupted.harness?.version !== 2) throw new Error('Expected adaptive');
+  expect(interrupted.harness.orchestration.tasks.every((t) => t.status === 'interrupted')).toBe(
+    true,
+  );
+  const waitingState = createAdaptiveState(
+    'Research',
+    defaultAdaptiveOptions,
+    defaultHarnessConfig,
+  );
+  waitingState.question = 'Which region?';
+  createTask(waitingState, 'researcher', 'Investigate', new Date().toISOString());
+  const waiting = await reopened.createRun(chat.id, {
+    ...input,
+    mode: 'research',
+    harness: defaultAdaptiveOptions,
+    harnessState: waitingState,
+  });
+  await reopened.updateRun(waiting.id, { status: 'waiting' });
+  await reopened.cancelWaitingHarness(waiting.id);
+  const cancelled = (await reopened.run(waiting.id)).harness;
+  if (cancelled?.version !== 2) throw new Error('Expected adaptive');
+  expect(cancelled.orchestration.tasks[0]?.status).toBe('cancelled');
 });

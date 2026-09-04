@@ -41,7 +41,7 @@ export const harnessCapabilities = Object.freeze({
   clarification: true,
   streaming: true,
   steering: true,
-  recursiveOrchestration: false,
+  recursiveOrchestration: true,
   experiments: false,
 });
 

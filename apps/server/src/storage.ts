@@ -681,6 +681,12 @@ export class WorkspaceStore {
       if (run.status !== 'waiting')
         throw new AppError(409, 'NOT_WAITING', 'Research has already continued.');
       run.status = 'cancelled';
+      if (run.harness?.version === 2)
+        for (const task of run.harness.orchestration.tasks)
+          if (['pending', 'queued'].includes(task.status)) {
+            task.status = 'cancelled';
+            task.completedAt = now();
+          }
       run.completedAt = now();
       run.updatedAt = now();
       document.events.push({

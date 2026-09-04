@@ -151,6 +151,12 @@ export class AdaptiveResearch {
         (error instanceof CodexProviderError &&
           ['TURN_FAILED', 'INVALID_RESPONSE'].includes(error.code))
       )) {
+        task.status = 'failed';
+        task.completedAt = now();
+        task.error =
+          error instanceof CodexProviderError
+            ? error.message.slice(0, 1000)
+            : 'The provider could not continue this assignment.';
         this.executionFailure = error;
         this.controller.abort();
         throw error;

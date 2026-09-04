@@ -48,7 +48,7 @@ export function ResearchWorkspace({
   onSaved: () => void;
   onConfigure: () => void;
 }) {
-  const [tab, setTab] = useState<WorkspaceTab>('conversation');
+  const [selectedTab, setTab] = useState<WorkspaceTab | null>(null);
   const [draft, setDraft] = useState('');
   const [mode, setMode] = useState<RunMode>('chat');
   const [model, setModel] = useState(settings.model);
@@ -66,6 +66,11 @@ export function ResearchWorkspace({
   } = useConversation(project.id, chat?.id, revision);
   const provider = useCodexModels();
   const activeRun = detail?.runs.find(isActiveRun);
+  const tab =
+    selectedTab ??
+    (activeRun?.harness?.version === 2 && activeRun.status !== 'waiting'
+      ? 'orchestration'
+      : 'conversation');
   const researchRun = detail?.runs.filter((run) => run.harness?.version === 2).at(-1);
   const selectedMode = activeRun?.mode ?? mode;
   const latestProgress = activeRun
