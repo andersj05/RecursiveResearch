@@ -4,21 +4,13 @@
 
 ## Current objective
 
-The first inspectable sequential research harness is implemented on `feat/research-harness`, based on the latest `dev`. See the [implementation plan](../plans/research-harness.md) and [harness architecture](../architecture/RESEARCH_HARNESS.md).
-
-## Branch state
-
-The released single-turn foundation remains on `main` and `dev`. The feature branch contains frequent design, algorithm, runtime, UI, and integration checkpoints. Integration into `dev` and release promotion remain review steps.
+Adaptive delegated research and an expert dashboard are implemented on `feat/research-harness`, revising open PR #1 into `dev`. See [the plan](../plans/adaptive-research.md) and [architecture](../architecture/RESEARCH_HARNESS.md).
 
 ## Immediate next actions
 
-- Final root validation passed all 57 tests and the production build. Review the feature PR into `dev`; release promotion is a separate step.
-- Review the new harness UX, source records, and explicit limitations before promotion.
-
-## Next product phase
-
-Recursive parent/child scheduling, source-level verification, cancellation propagation across child jobs, and restart replay remain future work. Experiments remain deferred.
+- Final local validation passed 73 tests and the production build. Publish the revised feature PR and verify remote CI.
+- Review the research UX and bounded runtime before integration into `dev`. Release promotion into `main` remains separate.
 
 ## Blockers
 
-None for local implementation. Active research interrupted by restart is inspectable but not automatically replayed.
+No local implementation blocker. Active research is not automatically replayed after restart; saved clarification can continue.

@@ -70,4 +70,4 @@ Prefer `New project`, `New chat`, `Research`, and `Stop` over clever or technica
 - Keep all actions reachable on narrow screens and do not hide required navigation.
 - Inspect desktop, narrow layouts, keyboard interaction, loading/error states, and reduced motion when changing a shared component.
 
-Product copy should explain research work, not expose adapter protocols, internal package names, implementation status, or decorative technical language.
+Everyday conversation copy should explain research work. The expert harness inspector intentionally exposes actual launch arguments, captured requests, tool parameters, and scheduling algorithms behind labeled disclosure controls. Keep technical details accurate and relevant; do not add decorative implementation language.

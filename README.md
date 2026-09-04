@@ -3,8 +3,8 @@
 A local workspace for focused research with Codex.
 Organize projects and chats, keep research in folders you choose, and run chat or web research jobs from one restrained interface.
 
-Each job runs one managed Codex turn.
-Recursive multi-agent orchestration and experiments remain future work.
+Chat uses one managed Codex turn. Research delegates parallel source investigations, follows new questions, and iterates through synthesis within explicit budgets.
+The Research harness page shows agents, tool calls, source observations, loop decisions, and expert runtime details. Experiments and independent citation verification remain future work.
 
 ## Start developing
 
@@ -36,7 +36,7 @@ apps/
 packages/
   contracts/            Shared schemas and API types
   codex-provider/       Restricted Codex app-server connection and execution
-  harness/              Turn guidance and future recursive harness contracts
+  harness/              Adaptive research policy, source handling, and turn guidance
 docs/
   architecture/         Component boundaries and persistence ownership
   design/               Frontend conventions

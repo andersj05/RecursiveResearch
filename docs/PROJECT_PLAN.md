@@ -16,7 +16,7 @@ Later messages resume the saved Codex thread.
 A completed Research response is published as a project-owned Markdown report.
 
 The execution boundary is read-only and requires no approvals.
-External tools, connected apps, plugins, MCP servers, multi-agent delegation, and project-instruction loading are disabled through process-local provider configuration.
+External tools, connected apps, plugins, MCP servers, provider-native multi-agent delegation, and project-instruction loading are disabled through process-local provider configuration.
 Research mode may use Codex's built-in web search; Chat mode may not.
 
 This phase is locally release-validated by the complete repository check and a separate live-account Chat and Research smoke.
@@ -24,13 +24,11 @@ Remote CI remains a publication-time check.
 
 ## 3. Inspectable sequential research harness - implemented
 
-The [harness page](architecture/RESEARCH_HARNESS.md) shows the executable scope, plan, gather, review, and report graph, stage tool access, deterministic routing rules, saved evidence, and execution history. Clarification pauses durably for the user; bounded gathering repeats for unresolved gaps. Recursive delegation and independent source verification remain deferred.
+The [harness page](architecture/RESEARCH_HARNESS.md) shows the executable scope, plan, gather, review, and report graph, stage tool access, deterministic routing rules, saved evidence, and execution history. Clarification pauses durably for the user; bounded gathering repeats for unresolved gaps. Legacy sequential snapshots remain supported; new research uses phase 4. Independent source verification remains deferred.
 
-## 4. Recursive research orchestration
+## 4. Adaptive delegated research — implemented
 
-Add bounded child agents, visible assignments, and durable parent/child relationships.
-Define scheduling, budgets, cancellation propagation, restart recovery, source-level provenance, and evidence reconciliation before execution.
-Require behavior tests for concurrent completion, partial failure, cancellation, steering order, and restart.
+The server schedules bounded parallel child turns over a prioritized question frontier. Sources retain agent observations, synthesis identifies gaps and contradictions, and follow-up questions form deeper branches. The expert dashboard exposes tasks, tool arguments, requests, budgets, and loop decisions. See [ADR-0008](adr/0008-server-owned-adaptive-research.md) and [verification](memory/progress.md). Restart interruption is supported; automatic replay is deferred.
 
 ## 5. Research synthesis and memory
 

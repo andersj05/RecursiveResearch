@@ -10,8 +10,8 @@ Use [the documentation map](docs/README.md) to load only the relevant architectu
 
 - RecursiveResearch is a local research workspace with projects, project chats, and managed Codex chat and research jobs.
 - A project belongs to a user-selected folder; its research files belong in that folder.
-- The current milestone runs one Codex turn per job with live output, stop, in-turn steering, per-turn model and thinking controls, and saved research reports.
-- Recursive multi-agent orchestration, autonomous experiments, and structured evidence reconciliation remain future work; do not imply that they are implemented.
+- Chat runs one Codex turn; Research defaults to bounded adaptive delegation with live tools, source observations, steering, stop, and saved reports.
+- Server-owned child research, adaptive synthesis, and bounded parallel scheduling are implemented. Independent source verification, autonomous experiments, distributed execution, and automatic replay remain future work.
 - Keep repository development memory separate from users' research data.
 
 ## Architecture and style
@@ -20,7 +20,7 @@ Use [the documentation map](docs/README.md) to load only the relevant architectu
 - `apps/server`: local Node server, application services, folder access, persistence, run coordination, and provider lifecycle.
 - `packages/contracts`: shared schemas and transfer types; validate external input at boundaries.
 - `packages/codex-provider`: official Codex app-server account and restricted-turn adapter; never put provider credentials or provider RPC in the browser.
-- `packages/harness`: provider-neutral turn guidance and future recursive harness contracts; keep process lifecycle and durable scheduling on the server.
+- `packages/harness`: provider-neutral guidance, frontier algorithms, and research contracts; keep process lifecycle and durable scheduling on the server.
 - Use strict TypeScript, named domain concepts, small focused modules, and one source of truth per contract.
 - Follow [the design system](docs/design/DESIGN_SYSTEM.md), derived from Portfolio.
 - Centralize visual tokens; use semantic HTML, visible focus, accessible labels, responsive layouts, and reduced-motion support.

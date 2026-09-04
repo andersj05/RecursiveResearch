@@ -1,6 +1,6 @@
 # Plan: Adaptive delegated research and expert dashboard
 
-**Status:** In progress
+**Status:** Implemented; final validation and delivery recorded in [progress](../memory/progress.md)
 **Branch:** feat/research-harness (revision of open PR #1)
 
 ## Outcome

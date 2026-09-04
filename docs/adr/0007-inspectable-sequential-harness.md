@@ -1,6 +1,6 @@
 # ADR-0007: Inspectable sequential research harness
 
-**Status:** Accepted
+**Status:** Superseded for new UI research by [ADR-0008](0008-server-owned-adaptive-research.md); retained for legacy jobs
 **Date:** 2026-09-04
 
 ## Decision

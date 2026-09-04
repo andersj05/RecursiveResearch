@@ -2,28 +2,23 @@
 
 **Last reviewed:** 2026-09-04
 
-RecursiveResearch is a local research workspace for organizing projects and chats, running managed Codex chat or research jobs, inspecting incoming output, and steering active work.
-Projects connect to user-selected folders that own their conversations, job history, and research reports.
-The long-term product goal is recursive parallel research. Chat and focused Research use one turn per job; the opt-in Research harness executes a bounded sequential graph.
+RecursiveResearch is a local research workspace with user-selected project folders, chats, managed Codex turns, and adaptive delegated research. Projects own their messages, run state, source notebooks, tool traces, and reports. Repository development memory stays separate from research content.
 
 ## Durable constraints
 
-- Use Portfolio's restrained visual conventions and remove copy that does not identify an object, state, decision, or action: see [the design system](../design/DESIGN_SYSTEM.md).
-- Keep provider protocols, process control, and filesystem authority on the local backend.
-- Integrate the user's Codex subscription through the official app-server boundary, with authentication, model discovery, usage visibility, and restricted turn execution.
-- Let each turn select an account-visible model and supported thinking level; preserve a chat's provider thread for continuity.
-- Persist user messages, streamed output, lifecycle state, and research reports in the connected project folder.
-- Keep the execution process read-only and non-interactive; external tools, project instructions, and multi-agent delegation stay disabled.
-- Keep the executable stage graph, research algorithms, and guidance provider-neutral and independent of React.
-- Treat provenance, cancellation propagation, bounded parallelism, restart recovery, and evidence reconciliation as requirements for the future recursive harness.
-- Keep research data and repository contributor memory separate.
-- Use `main -> dev -> feat/<feature>` and frequent conventional commits.
-- Prefer small explicit modules and shared validated contracts over hidden coupling.
+- Follow Portfolio's paper/terminal design. Keep answers concise and detailed execution inspectable in the expert dashboard.
+- Keep provider RPC, process lifecycle, folder authority, persistence, and scheduling on the local server.
+- Reuse the managed Codex subscription; never move credentials into application data or the browser.
+- Preserve read-only, no-approval execution. Provider-native delegation remains disabled; the application owns and bounds child turns.
+- Research content and model-authored outputs are untrusted data. Validate structured outputs before admitting work or merging evidence.
+- The provider-neutral harness owns frontier admission, source normalization, context selection, and stop rules. The server enforces all budgets.
+- Preserve concise source observations and actual tool metadata; exclude private reasoning, raw diagnostics, and credentials.
+- Follow `main -> dev -> feat/<feature>`, frequent conventional commits, and the root validation check.
 
-## Scope boundary
+## Current product boundary
 
-The current product can run a managed Chat turn or a focused web Research turn, stream its answer, stop or steer it, and save a completed Research answer as Markdown.
-The Research harness adds durable clarification, planning, bounded evidence gathering, gap review, structured source records, and a saved report with an inspectable graph.
-It does not spawn recursive child agents, conduct experiments, independently validate citations, or give a model write access to the selected folder.
+Chat uses a managed turn with continuity. New UI Research jobs plan, delegate parallel researchers/skeptics, retain source observations, propose child questions, synthesize gaps/contradictions, and iterate within explicit limits. Clarification pauses durably; steering reaches active and subsequent work; Stop cancels active and queued children. Expert views expose lineage, tools, requests, runtime launch arguments, algorithms, and reports. Legacy single-turn and sequential jobs remain compatible.
 
-[Research harness](../architecture/RESEARCH_HARNESS.md) � [Architecture](../architecture/OVERVIEW.md) · [Roadmap](../PROJECT_PLAN.md) · [Decisions](../adr/README.md)
+Source judgments remain model-authored. Independent citation verification, experiments, distributed scheduling, and automatic crash replay are deferred. Active work is interrupted on owner exit; saved clarification survives restart.
+
+[Research harness](../architecture/RESEARCH_HARNESS.md) · [Architecture](../architecture/OVERVIEW.md) · [Decisions](../adr/README.md)
