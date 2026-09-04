@@ -9,7 +9,7 @@ import {
   readdir,
   unlink,
 } from 'node:fs/promises';
-import { homedir } from 'node:os';
+import { homedir, hostname } from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
 import {
@@ -17,8 +17,10 @@ import {
   chatSchema,
   messageSchema,
   researchEventSchema,
+  runSchema,
   harnessConfigSchema,
   defaultHarnessConfig,
+  isActiveRun as activeRun,
   type Project,
   type Chat,
   type Message,
@@ -26,6 +28,8 @@ import {
   type Workspace,
   type ChatDetail,
   type Artifact,
+  type Run,
+  type StartRunInput,
 } from '@recursive-research/contracts';
 import { AppError } from './errors.js';
 import { assertFileLocksHeld, withFileLock } from './file-lock.js';
@@ -41,10 +45,83 @@ const documentSchema = z.object({
   chats: z.array(chatSchema),
   messages: z.array(messageSchema),
   events: z.array(researchEventSchema),
+  runs: z
+    .array(
+      runSchema.extend({
+        owner: z.object({ pid: z.number().int().positive(), host: z.string() }),
+      }),
+    )
+    .default([]),
 });
 type Registry = z.infer<typeof registrySchema>;
 type ProjectDocument = z.infer<typeof documentSchema>;
 const now = () => new Date().toISOString();
+type StoredRun = ProjectDocument['runs'][number];
+export interface ResolvedRunInput extends Omit<StartRunInput, 'model' | 'reasoningEffort'> {
+  model: string;
+  reasoningEffort: string;
+}
+
+export interface RunUpdate {
+  status?: Run['status'];
+  content?: string;
+  threadId?: string | null;
+  turnId?: string | null;
+  error?: string | null;
+  summary?: string;
+}
+
+/** EPERM and foreign hosts are not evidence that the owner stopped running. */
+function ownerIsDead(run: StoredRun): boolean {
+  if (run.owner.host !== hostname()) return false;
+  try {
+    process.kill(run.owner.pid, 0);
+    return false;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ESRCH';
+  }
+}
+
+function publicRun(run: StoredRun): Run {
+  return runSchema.parse(run);
+}
+
+function assertRunOwner(run: StoredRun): void {
+  if (run.owner.pid !== process.pid || run.owner.host !== hostname())
+    throw new AppError(
+      409,
+      'RUN_OWNED',
+      'This run belongs to another RecursiveResearch server. Use that server to stop it.',
+    );
+}
+
+function recoverAbandonedRuns(document: ProjectDocument): number {
+  let recovered = 0;
+  for (const run of document.runs) {
+    if (!activeRun(run) || !ownerIsDead(run)) continue;
+    const timestamp = now();
+    run.status = 'interrupted';
+    run.error = 'The server stopped before this run finished. Send a new message to continue.';
+    run.updatedAt = timestamp;
+    run.completedAt = timestamp;
+    const chat = document.chats.find((item) => item.id === run.chatId);
+    if (chat) chat.updatedAt = timestamp;
+    document.project.updatedAt = timestamp;
+    const assistant = document.messages.find((message) => message.id === run.assistantMessageId);
+    if (assistant) assistant.status = 'interrupted';
+    document.events.push({
+      id: randomUUID(),
+      projectId: run.projectId,
+      chatId: run.chatId,
+      runId: run.id,
+      type: 'run.interrupted',
+      summary: run.error,
+      createdAt: timestamp,
+    });
+    recovered++;
+  }
+  return recovered;
+}
 
 export function defaultDataDirectory(): string {
   return (
@@ -139,6 +216,7 @@ export class WorkspaceStore {
         });
       }
     });
+    await this.recoverRuns();
   }
 
   private registryPath(): string {
@@ -284,6 +362,7 @@ export class WorkspaceStore {
           title,
           createdAt: timestamp,
           updatedAt: timestamp,
+          codexThreadId: null,
         };
         document.chats.push(chat);
         document.project.updatedAt = timestamp;
@@ -319,6 +398,7 @@ export class WorkspaceStore {
       chat,
       messages: document.messages.filter((item) => item.chatId === id),
       events: document.events.filter((item) => item.chatId === id),
+      runs: document.runs.filter((item) => item.chatId === id).map(publicRun),
     };
   }
 
@@ -338,6 +418,8 @@ export class WorkspaceStore {
           role: 'user',
           content,
           createdAt: timestamp,
+          runId: null,
+          status: 'complete',
         };
         document.messages.push(message);
         document.events.push({
@@ -354,6 +436,250 @@ export class WorkspaceStore {
         await atomicJson(await this.documentLocation(project), document);
         return message;
       });
+    });
+  }
+
+  async getRunContext(
+    chatId: string,
+  ): Promise<{ project: Project; chat: Chat; messages: Message[] }> {
+    const { project, document, chat } = await this.findChat(chatId);
+    return {
+      project,
+      chat,
+      messages: document.messages.filter((message) => message.chatId === chatId),
+    };
+  }
+
+  createRun(chatId: string, input: ResolvedRunInput): Promise<Run> {
+    return this.serialized(async () => {
+      const { project } = await this.findChat(chatId);
+      return withFileLock(path.dirname(await this.documentLocation(project)), async () => {
+        const document = await this.document(project);
+        const chat = document.chats.find((item) => item.id === chatId);
+        if (!chat) throw new AppError(404, 'CHAT_NOT_FOUND', 'Chat not found.');
+        recoverAbandonedRuns(document);
+        if (document.runs.some((run) => run.chatId === chatId && activeRun(run)))
+          throw new AppError(409, 'RUN_ACTIVE', 'This chat already has a run in progress.');
+        const timestamp = now();
+        const userMessageId = randomUUID();
+        const assistantMessageId = randomUUID();
+        const run = runSchema.parse({
+          id: randomUUID(),
+          projectId: project.id,
+          chatId,
+          mode: input.mode,
+          status: 'queued',
+          model: input.model,
+          reasoningEffort: input.reasoningEffort,
+          threadId: chat.codexThreadId,
+          turnId: null,
+          userMessageId,
+          assistantMessageId,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          completedAt: null,
+          error: null,
+          reportPath: null,
+        });
+        const content = z.string().trim().min(1).max(50000).parse(input.content);
+        if (chat.title === 'New chat' || chat.title === 'New research')
+          chat.title = content.split(/\r?\n/, 1)[0]!.slice(0, 80);
+        document.messages.push(
+          {
+            id: userMessageId,
+            chatId,
+            runId: run.id,
+            role: 'user',
+            status: 'complete',
+            content,
+            createdAt: timestamp,
+          },
+          {
+            id: assistantMessageId,
+            chatId,
+            runId: run.id,
+            role: 'assistant',
+            status: 'streaming',
+            content: '',
+            createdAt: timestamp,
+          },
+        );
+        document.runs.push({ ...run, owner: { pid: process.pid, host: hostname() } });
+        document.events.push({
+          id: randomUUID(),
+          projectId: project.id,
+          chatId,
+          runId: run.id,
+          type: 'run.queued',
+          summary: input.mode === 'research' ? 'Research queued.' : 'Chat queued.',
+          createdAt: timestamp,
+        });
+        chat.updatedAt = timestamp;
+        document.project.updatedAt = timestamp;
+        await atomicJson(await this.documentLocation(project), document);
+        return run;
+      });
+    });
+  }
+
+  private async findRun(
+    id: string,
+  ): Promise<{ project: Project; document: ProjectDocument; run: StoredRun }> {
+    for (const project of (await this.registry()).projects) {
+      let document: ProjectDocument;
+      try {
+        document = await this.document(project);
+      } catch {
+        continue;
+      }
+      const run = document.runs.find((item) => item.id === id);
+      if (run) return { project, document, run };
+    }
+    throw new AppError(
+      404,
+      'RUN_NOT_FOUND',
+      'Run not found, or its project folder is unavailable.',
+    );
+  }
+
+  async run(id: string): Promise<Run> {
+    return publicRun((await this.findRun(id)).run);
+  }
+
+  private mutateRun<T>(
+    id: string,
+    operation: (document: ProjectDocument, run: StoredRun) => Promise<T>,
+  ): Promise<T> {
+    return this.serialized(async () => {
+      const { project } = await this.findRun(id);
+      return withFileLock(path.dirname(await this.documentLocation(project)), async () => {
+        const document = await this.document(project);
+        const run = document.runs.find((item) => item.id === id);
+        if (!run) throw new AppError(404, 'RUN_NOT_FOUND', 'Run not found.');
+        const result = await operation(document, run);
+        await atomicJson(await this.documentLocation(project), document);
+        return result;
+      });
+    });
+  }
+
+  updateRun(id: string, update: RunUpdate): Promise<Run> {
+    return this.mutateRun(id, async (document, run) => {
+      // Ignore late provider notifications after the terminal snapshot.
+      if (!activeRun(run)) return publicRun(run);
+      assertRunOwner(run);
+      const chat = document.chats.find((item) => item.id === run.chatId);
+      const assistant = document.messages.find((item) => item.id === run.assistantMessageId);
+      if (!chat || !assistant)
+        throw new AppError(409, 'INVALID_STORAGE', 'The run is missing its saved conversation.');
+      if (update.status === 'queued' && run.status === 'running')
+        throw new AppError(409, 'INVALID_RUN_STATE', 'A running job cannot return to the queue.');
+      if (update.content !== undefined)
+        assistant.content = messageSchema.shape.content.parse(update.content);
+      if (update.threadId !== undefined) {
+        run.threadId = update.threadId;
+        chat.codexThreadId = update.threadId;
+      }
+      if (update.turnId !== undefined) run.turnId = update.turnId;
+      if (update.error !== undefined) run.error = update.error;
+      const timestamp = now();
+      const changedStatus = update.status !== undefined && update.status !== run.status;
+      if (update.status !== undefined) run.status = update.status;
+      run.updatedAt = timestamp;
+      chat.updatedAt = timestamp;
+      document.project.updatedAt = timestamp;
+      if (!activeRun(run)) {
+        run.completedAt = timestamp;
+        assistant.status =
+          run.status === 'completed'
+            ? 'complete'
+            : run.status === 'failed'
+              ? 'failed'
+              : 'interrupted';
+        if (run.status === 'completed' && run.mode === 'research')
+          run.reportPath = await this.saveResearchReport(document, run);
+      }
+      if (changedStatus || update.summary) {
+        const statusEvents = {
+          queued: 'run.queued',
+          running: 'run.started',
+          completed: 'run.completed',
+          cancelled: 'run.cancelled',
+          failed: 'run.failed',
+          interrupted: 'run.interrupted',
+        } as const;
+        document.events.push({
+          id: randomUUID(),
+          projectId: run.projectId,
+          chatId: run.chatId,
+          runId: run.id,
+          type: changedStatus ? statusEvents[run.status] : 'tool.progress',
+          summary: update.summary ?? run.error ?? `Run ${run.status}.`,
+          createdAt: timestamp,
+        });
+      }
+      return publicRun(run);
+    });
+  }
+
+  async recoverRuns(): Promise<number> {
+    return this.serialized(async () => {
+      let recovered = 0;
+      for (const project of (await this.registry()).projects) {
+        let location: string;
+        try {
+          location = await this.documentLocation(project);
+          await this.document(project);
+        } catch {
+          // An unavailable or malformed project stays untouched and reconnectable.
+          continue;
+        }
+        recovered += await withFileLock(path.dirname(location), async () => {
+          const document = await this.document(project);
+          const count = recoverAbandonedRuns(document);
+          if (count) await atomicJson(location, document);
+          return count;
+        });
+      }
+      return recovered;
+    });
+  }
+
+  private async saveResearchReport(document: ProjectDocument, run: StoredRun): Promise<string> {
+    if (run.mode !== 'research')
+      throw new AppError(409, 'NOT_RESEARCH', 'Only research runs create reports.');
+    const assistant = document.messages.find((item) => item.id === run.assistantMessageId);
+    if (!assistant?.content.trim())
+      throw new AppError(409, 'EMPTY_REPORT', 'The research run did not produce a report.');
+    const root = path.join(
+      path.dirname(await this.documentLocation(document.project)),
+      'artifacts',
+    );
+    await assertOrdinary(root, 'directory');
+    const name = `research-${run.id}.md`;
+    const target = path.join(root, name);
+    const content = `${assistant.content.trimEnd()}\n`;
+    assertFileLocksHeld();
+    try {
+      await writeFile(target, content, { flag: 'wx', mode: 0o600 });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      await assertOrdinary(target, 'file');
+      // A previous write can have succeeded before publishing workspace.json.
+      // Accept that exact retry, but never overwrite an unrelated existing file.
+      if ((await readFile(target, 'utf8')) !== content)
+        throw new AppError(409, 'REPORT_EXISTS', 'A different file already uses this report name.');
+    }
+    assertFileLocksHeld();
+    return name;
+  }
+
+  writeResearchReport(id: string): Promise<string> {
+    return this.mutateRun(id, async (document, run) => {
+      if (activeRun(run)) assertRunOwner(run);
+      if (run.reportPath) return run.reportPath;
+      run.reportPath = await this.saveResearchReport(document, run);
+      return run.reportPath;
     });
   }
 
@@ -393,5 +719,40 @@ export class WorkspaceStore {
     };
     await visit(root, 0);
     return output;
+  }
+
+  async readArtifact(projectId: string, relativePath: string): Promise<string> {
+    const project = await this.findProject(projectId);
+    await this.document(project);
+    const root = path.join(path.dirname(await this.documentLocation(project)), 'artifacts');
+    await assertOrdinary(root, 'directory');
+    const segments = relativePath.split('/');
+    if (
+      path.isAbsolute(relativePath) ||
+      segments.some(
+        (segment) => !segment || segment === '.' || segment === '..' || /[\\:\0]/.test(segment),
+      )
+    )
+      throw new AppError(400, 'UNSAFE_PATH', 'Choose a file inside the project artifacts folder.');
+    let target = root;
+    for (let index = 0; index < segments.length; index++) {
+      target = path.join(target, segments[index]!);
+      await assertOrdinary(target, index === segments.length - 1 ? 'file' : 'directory');
+    }
+    const relative = path.relative(await realpath(root), await realpath(target));
+    if (
+      !relative ||
+      relative.startsWith(`..${path.sep}`) ||
+      relative === '..' ||
+      path.isAbsolute(relative)
+    )
+      throw new AppError(400, 'UNSAFE_PATH', 'Choose a file inside the project artifacts folder.');
+    const limit = 2 * 1024 * 1024;
+    if ((await lstat(target)).size > limit)
+      throw new AppError(413, 'ARTIFACT_TOO_LARGE', 'This file is too large to preview.');
+    const content = await readFile(target, 'utf8');
+    if (Buffer.byteLength(content) > limit)
+      throw new AppError(413, 'ARTIFACT_TOO_LARGE', 'This file is too large to preview.');
+    return content;
   }
 }

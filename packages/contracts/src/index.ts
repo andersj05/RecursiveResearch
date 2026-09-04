@@ -19,6 +19,7 @@ export const chatSchema = z.object({
   title: z.string().trim().min(1).max(120),
   createdAt: timestamp,
   updatedAt: timestamp,
+  codexThreadId: z.string().nullable().default(null),
 });
 export type Chat = z.infer<typeof chatSchema>;
 
@@ -26,8 +27,10 @@ export const messageSchema = z.object({
   id: idSchema,
   chatId: idSchema,
   role: z.enum(['user', 'assistant', 'system']),
-  content: z.string().trim().min(1).max(50000),
+  content: z.string().max(200000),
   createdAt: timestamp,
+  runId: idSchema.nullable().default(null),
+  status: z.enum(['complete', 'streaming', 'interrupted', 'failed']).default('complete'),
 });
 export type Message = z.infer<typeof messageSchema>;
 
@@ -45,6 +48,10 @@ export const researchEventSchema = z.object({
     'steering.accepted',
     'run.completed',
     'run.failed',
+    'run.queued',
+    'run.cancelled',
+    'run.interrupted',
+    'tool.progress',
   ]),
   summary: z.string(),
   createdAt: timestamp,
@@ -55,6 +62,7 @@ export const harnessConfigSchema = z
   .object({
     version: z.literal(1),
     model: z.string().min(1).max(200).nullable(),
+    reasoningEffort: z.string().min(1).max(40).nullable().default(null),
     maxParallelAgents: z.number().int().min(1).max(16),
     maxDepth: z.number().int().min(1).max(10),
     maxSourcesPerAgent: z.number().int().min(1).max(100),
@@ -66,6 +74,7 @@ export type HarnessConfig = z.infer<typeof harnessConfigSchema>;
 export const defaultHarnessConfig: HarnessConfig = {
   version: 1,
   model: null,
+  reasoningEffort: null,
   maxParallelAgents: 3,
   maxDepth: 3,
   maxSourcesPerAgent: 12,
@@ -78,7 +87,52 @@ export const createProjectSchema = z
   .object({ name: projectSchema.shape.name, folderPath: z.string().trim().min(1).max(4000) })
   .strict();
 export const createChatSchema = z.object({ title: chatSchema.shape.title }).strict();
-export const createMessageSchema = z.object({ content: messageSchema.shape.content }).strict();
+export const createMessageSchema = z
+  .object({ content: z.string().trim().min(1).max(50000) })
+  .strict();
+
+export const runModeSchema = z.enum(['chat', 'research']);
+export type RunMode = z.infer<typeof runModeSchema>;
+export const runStatusSchema = z.enum([
+  'queued',
+  'running',
+  'completed',
+  'cancelled',
+  'failed',
+  'interrupted',
+]);
+export const runSchema = z.object({
+  id: idSchema,
+  projectId: idSchema,
+  chatId: idSchema,
+  mode: runModeSchema,
+  status: runStatusSchema,
+  model: z.string(),
+  reasoningEffort: z.string(),
+  threadId: z.string().nullable(),
+  turnId: z.string().nullable(),
+  userMessageId: idSchema,
+  assistantMessageId: idSchema,
+  createdAt: timestamp,
+  updatedAt: timestamp,
+  completedAt: timestamp.nullable(),
+  error: z.string().nullable(),
+  reportPath: z.string().nullable(),
+});
+export type Run = z.infer<typeof runSchema>;
+export const startRunSchema = z
+  .object({
+    content: createMessageSchema.shape.content,
+    mode: runModeSchema.default('chat'),
+    model: z.string().min(1).max(200).nullable().default(null),
+    reasoningEffort: z.string().min(1).max(40).nullable().default(null),
+  })
+  .strict();
+export type StartRunInput = z.infer<typeof startRunSchema>;
+
+export function isActiveRun(run: Pick<Run, 'status'>): boolean {
+  return run.status === 'queued' || run.status === 'running';
+}
 
 export interface Workspace {
   projects: Project[];
@@ -89,6 +143,7 @@ export interface ChatDetail {
   chat: Chat;
   messages: Message[];
   events: ResearchEvent[];
+  runs: Run[];
 }
 export interface Artifact {
   name: string;
