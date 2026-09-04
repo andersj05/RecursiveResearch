@@ -4,20 +4,19 @@
 
 ## Current objective
 
-The simplified RR interface and managed single-turn Codex runtime are implemented and locally verified on `feat/project-foundation`.
-The feature branch is ready for review and later integration into `dev`.
+The simplified RR interface and managed single-turn Codex runtime are implemented, locally verified, and released through `dev` to `main`.
+Future product work should start from `dev` on a focused `feat/<feature>` branch.
 See [progress](progress.md) for verified capabilities and remaining limits.
 
 ## Branch state
 
-Local `main`, `dev`, and `feat/project-foundation` branches exist.
-Current work remains on the feature branch; `main` and `dev` stay at the initial baseline pending publication and integration.
-No remote changes or branch protections have been installed.
+`feat/project-foundation` records the implementation history, `dev` contains its integration commit, and `main` contains the promoted release.
+The three branches are published to `origin`.
+Remote branch protections have not been installed.
 
 ## Immediate next actions
 
-- Review and integrate `feat/project-foundation` into `dev` when the owner is ready.
-- Obtain explicit authorization before publishing source to the public GitHub remote; automatic approval review rejected the earlier push because that authorization was absent.
+- Begin the recursive orchestration design from the latest `dev` when that phase starts.
 
 ## Next product phase
 
@@ -26,5 +25,4 @@ Experiments remain deferred.
 
 ## Blockers
 
-Public-remote publication remains blocked on explicit authorization.
-Local development is otherwise unblocked.
+None for local development.

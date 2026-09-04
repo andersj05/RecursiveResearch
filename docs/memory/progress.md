@@ -38,9 +38,9 @@ The workspace includes the simplified Portfolio-derived RR interface, local back
 
 ## Delivery state
 
-Local `main`, `dev`, and `feat/project-foundation` exist, with implementation on the feature branch and `main`/`dev` still at their initial baseline.
-Automatic approval review rejected a push to the public GitHub remote because explicit authorization to publish source was absent.
-No remote changes were made, no remote CI result is claimed, and branch protections are not installed.
+The foundation history is integrated from `feat/project-foundation` into `dev` and promoted from `dev` into `main` with explicit merge commits.
+All three branches are published to `origin` with `main` as the remote default branch.
+No remote CI result is claimed until GitHub Actions completes, and branch protections are not installed.
 
 ## Deliberate limitations
 
