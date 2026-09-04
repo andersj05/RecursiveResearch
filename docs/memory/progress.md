@@ -4,7 +4,7 @@
 
 ## Implemented
 
-The released single-turn foundation remains on `main` and `dev`. `feat/research-harness` adds the [adaptive research harness](../architecture/RESEARCH_HARNESS.md), with legacy sequential compatibility.
+The release includes the single-turn foundation and the [adaptive research harness](../architecture/RESEARCH_HARNESS.md), with legacy sequential compatibility.
 
 - Project-owned chats, durable runs, streamed answers, reports, and a managed Codex subscription with account-visible model/thinking controls.
 - Autonomous planner, parallel researcher/skeptic assignments, parent/child question discovery, prioritized frontier, source observations, iterative synthesis, and concise reports.
@@ -29,7 +29,7 @@ The released single-turn foundation remains on `main` and `dev`. `feat/research-
 
 ## Delivery
 
-[PR #1](https://github.com/andersj05/RecursiveResearch/pull/1) targets `dev`; implementation revision `d5d0fa0` passed Windows and Ubuntu CI and branch-flow validation. No merge or release promotion has been performed.
+[PR #1](https://github.com/andersj05/RecursiveResearch/pull/1) delivers the feature into `dev`. Final implementation revision `e13a373` passed Windows and Ubuntu CI and branch-flow validation. The owner authorized promotion through `dev` into `main`; GitHub pull request and branch history are the authoritative delivery status.
 
 ## Limits
 

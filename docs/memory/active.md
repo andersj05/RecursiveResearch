@@ -4,13 +4,13 @@
 
 ## Current objective
 
-The project-owned research flow is implemented on `feat/research-harness`, revising open PR #1 into `dev`. Harness now contains configuration/reference only; project chats own research. The stale running server was refreshed with its verified existing registry and project/chat IDs preserved. See [the plan](../plans/project-research-flow.md).
+Implementation and review checks are complete. The owner authorized merging the adaptive harness and project-owned research workflow through `dev` into `main` and pushing both branches. Release promotion is tracked by the repository pull requests.
 
 ## Immediate next actions
 
-- Review PR #1 with the revised navigation. Local root validation passed 76 tests and the production build; final UI refinements also build successfully. Check the PR for current CI results.
-- Review the revised project chat workflow before integration into `dev`. Release promotion into `main` remains separate.
+- Complete the authorized release promotion and verify remote branch ancestry and CI.
+- Future research-quality work should retain the limitations documented in [verified progress](progress.md).
 
 ## Blockers
 
-No local implementation blocker. Active research is not automatically replayed after restart; saved clarification can continue.
+No implementation blocker. Active research is not automatically replayed after restart; saved clarification can continue.
