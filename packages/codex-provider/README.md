@@ -2,8 +2,8 @@
 
 This package connects RecursiveResearch to a locally installed Codex CLI through
 the documented `codex app-server` JSONL protocol. It provides account status,
-browser sign-in and cancellation, model discovery, and account quota windows.
-It intentionally exposes no agent execution methods yet.
+browser sign-in and cancellation, model discovery, account quota windows, and
+bounded streaming chat/research turns.
 
 Codex owns subscription credentials, OAuth callback handling, storage, and token
 refresh. RecursiveResearch does not read `auth.json`, receive OAuth tokens, copy
@@ -14,6 +14,21 @@ Use `new CodexProvider({ executable: process.env.CODEX_EXECUTABLE })` in the loc
 server. The executable defaults to `codex` on PATH; on Windows, point an override
 at a native `codex.exe`, not a `.cmd`/PowerShell wrapper. Arguments are passed
 directly with shell execution disabled. The provider must remain server-only.
+
+`executeTurn` starts or resumes a Codex thread in a project folder, applies the
+selected model and effort, and emits allowlisted message and progress events.
+Chat disables web search; research uses live web search. `steerTurn` adds user
+input to an active turn, while an abort signal interrupts it. Results prefer
+`final_answer` messages over commentary.
+
+Execution uses `approvalPolicy: never` and a read-only sandbox with command
+network access disabled. Process-local overrides disable shell, file mutation,
+apps, plugins, MCP, browser/computer use, subagents, hooks, and workspace skills
+without editing the user's shared Codex configuration. Before inference, the
+adapter verifies the effective feature flags, returned sandbox, and empty
+thread-scoped MCP inventory. The public API exposes no general RPC, tool approval,
+shell, or external-token handler. Only standalone web search is enabled for a
+research turn.
 
 Call `startLogin()` from an explicit Connect action, open its HTTPS `authUrl`, and
 keep this provider alive while Codex receives the browser callback. Subscribe to
@@ -34,6 +49,9 @@ For an explicit live metadata check after signing in to Codex, run
 `npm run check:connection --workspace @recursive-research/codex-provider`. It
 prints only connection state and model/quota bucket counts, and makes no model
 inference request. This separate check is intentionally excluded from CI.
+`npm run check:execution-config --workspace @recursive-research/codex-provider`
+also makes no inference request; it creates an empty ephemeral thread to verify
+that the installed CLI honors the sandbox and tool restrictions.
 
 Protocol source: [official OpenAI Codex App Server documentation](https://learn.chatgpt.com/docs/app-server),
 checked September 4, 2026. The protocol evolves with the CLI: if an update changes

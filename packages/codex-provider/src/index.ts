@@ -1,4 +1,6 @@
 import { AppServerRpc, isRecord, type RpcOptions } from './rpc.js';
+import { executionConfig } from './execution-config.js';
+import { TurnExecution } from './turn.js';
 import {
   CodexProviderError,
   type CodexAccount,
@@ -9,6 +11,9 @@ import {
   type CodexRateLimits,
   type CodexStatus,
   type CodexUsage,
+  type CodexTurnInput,
+  type CodexTurnEvent,
+  type CodexTurnResult,
 } from './types.js';
 
 export * from './types.js';
@@ -91,7 +96,7 @@ function readModel(value: unknown): CodexModel {
 
 /**
  * Managed ChatGPT subscription connection through the official Codex app-server.
- * This foundation intentionally has no model execution or general RPC method.
+ * Only account operations and bounded chat/research execution are public.
  */
 export class CodexProvider {
   private readonly rpc: AppServerRpc;
@@ -99,12 +104,15 @@ export class CodexProvider {
   private login: CodexLogin | null = null;
   private startingLogin: Promise<{ loginId: string; authUrl: string }> | null = null;
   private readonly recentLogins = new Map<string, CodexLogin>();
+  private readonly turns = new Map<string, TurnExecution>();
+  private readonly preparingThreads = new Set<string>();
 
   constructor(options: CodexProviderOptions = {}) {
     this.rpc = new AppServerRpc(
       options,
       (method, params) => this.onNotification(method, params),
-      () => {
+      (error) => {
+        for (const turn of this.turns.values()) turn.fail(error);
         if (this.login?.status === 'pending') {
           this.login = {
             ...this.login,
@@ -259,6 +267,157 @@ export class CodexProvider {
     return { rateLimits: readRateLimits(value.rateLimits), rateLimitsByLimitId: byId };
   }
 
+  async executeTurn(
+    input: CodexTurnInput,
+    onEvent: (event: CodexTurnEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<CodexTurnResult> {
+    const cancelled = () => {
+      if (signal?.aborted)
+        throw new CodexProviderError('TURN_CANCELLED', 'The turn was stopped before it started.');
+    };
+    cancelled();
+    if (
+      input.threadId &&
+      (this.preparingThreads.has(input.threadId) || this.turns.has(input.threadId))
+    ) {
+      throw new CodexProviderError(
+        'TURN_IN_PROGRESS',
+        'This conversation already has an active turn.',
+      );
+    }
+    if (input.threadId) this.preparingThreads.add(input.threadId);
+    let active: TurnExecution | undefined;
+    const abort = () => active?.interrupt();
+    try {
+      const account = readAccount(await this.rpc.request('account/read', { refreshToken: false }));
+      if (account?.type !== 'chatgpt')
+        throw new CodexProviderError(
+          'NOT_SIGNED_IN',
+          'Connect your Codex subscription before sending a message.',
+        );
+      cancelled();
+      const config = executionConfig(
+        await this.rpc.request('config/read', { includeLayers: false, cwd: input.cwd }),
+        input.mode,
+      );
+      cancelled();
+      const thread = await this.rpc.request(input.threadId ? 'thread/resume' : 'thread/start', {
+        ...(input.threadId ? { threadId: input.threadId } : { serviceName: 'recursive_research' }),
+        cwd: input.cwd,
+        model: input.model,
+        approvalPolicy: 'never',
+        sandbox: 'read-only',
+        config,
+        developerInstructions: input.instructions,
+      });
+      if (
+        !isRecord(thread) ||
+        !isRecord(thread.thread) ||
+        typeof thread.thread.id !== 'string' ||
+        !thread.thread.id
+      )
+        throw invalidResponse();
+      if (input.threadId && thread.thread.id !== input.threadId) throw invalidResponse();
+      if (
+        thread.approvalPolicy !== 'never' ||
+        !isRecord(thread.sandbox) ||
+        thread.sandbox.type !== 'readOnly' ||
+        thread.sandbox.networkAccess !== false
+      ) {
+        throw new CodexProviderError(
+          'EXECUTION_UNAVAILABLE',
+          'Codex did not apply read-only execution permissions. Reconnect before trying again.',
+        );
+      }
+      try {
+        onEvent({ type: 'thread', threadId: thread.thread.id });
+      } catch {
+        /* Isolate observers. */
+      }
+      cancelled();
+      const seenCursors = new Set<string>();
+      let cursor: string | null = null;
+      for (let page = 0; page < 100; page++) {
+        const inventory = await this.rpc.request('mcpServerStatus/list', {
+          threadId: thread.thread.id,
+          limit: 100,
+          cursor,
+        });
+        if (
+          !isRecord(inventory) ||
+          !Array.isArray(inventory.data) ||
+          inventory.data.some(
+            (server) =>
+              !isRecord(server) ||
+              server.runtimeStatus !== 'disabled' ||
+              !isRecord(server.tools) ||
+              Object.keys(server.tools).length !== 0,
+          )
+        ) {
+          throw new CodexProviderError(
+            'EXECUTION_UNAVAILABLE',
+            'Codex still exposes external tools for this conversation. Reconnect before trying again.',
+          );
+        }
+        if (inventory.nextCursor === null) break;
+        if (
+          typeof inventory.nextCursor !== 'string' ||
+          seenCursors.has(inventory.nextCursor) ||
+          page === 99
+        )
+          throw invalidResponse();
+        cursor = inventory.nextCursor;
+        seenCursors.add(cursor);
+      }
+      cancelled();
+      if (this.turns.has(thread.thread.id))
+        throw new CodexProviderError(
+          'TURN_IN_PROGRESS',
+          'This conversation already has an active turn.',
+        );
+      active = new TurnExecution(thread.thread.id, this.rpc, onEvent);
+      this.turns.set(thread.thread.id, active);
+      signal?.addEventListener('abort', abort, { once: true });
+      try {
+        const turn = await this.rpc.request('turn/start', {
+          threadId: thread.thread.id,
+          input: [{ type: 'text', text: input.prompt }],
+          cwd: input.cwd,
+          model: input.model,
+          effort: input.effort,
+          summary: 'none',
+          approvalPolicy: 'never',
+          sandboxPolicy: { type: 'readOnly', networkAccess: false },
+        });
+        active.bind(turn);
+      } catch (error) {
+        active.fail(error instanceof CodexProviderError ? error : invalidResponse());
+        throw error;
+      }
+      return await active.completion;
+    } finally {
+      signal?.removeEventListener('abort', abort);
+      if (input.threadId) this.preparingThreads.delete(input.threadId);
+      if (active) this.turns.delete(active.threadId);
+    }
+  }
+
+  async steerTurn(threadId: string, turnId: string, prompt: string): Promise<void> {
+    if (this.turns.get(threadId)?.id !== turnId) {
+      throw new CodexProviderError(
+        'TURN_IN_PROGRESS',
+        'This turn is no longer active. Send a new message instead.',
+      );
+    }
+    const response = await this.rpc.request('turn/steer', {
+      threadId,
+      expectedTurnId: turnId,
+      input: [{ type: 'text', text: prompt }],
+    });
+    if (!isRecord(response) || response.turnId !== turnId) throw invalidResponse();
+  }
+
   subscribe(listener: (event: CodexProviderEvent) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -280,6 +439,9 @@ export class CodexProvider {
   }
 
   private onNotification(method: string, params: unknown): void {
+    if (isRecord(params) && typeof params.threadId === 'string') {
+      this.turns.get(params.threadId)?.receive(method, params);
+    }
     if (method === 'account/updated') this.emit({ type: 'account-updated' });
     if (method === 'account/rateLimits/updated') this.emit({ type: 'usage-updated' });
     if (

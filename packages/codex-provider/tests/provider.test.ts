@@ -1,6 +1,11 @@
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { CodexProvider, type CodexProviderEvent } from '../src/index.js';
+import {
+  CodexProvider,
+  type CodexProviderEvent,
+  type CodexTurnEvent,
+  type CodexTurnInput,
+} from '../src/index.js';
 
 const fixture = fileURLToPath(new URL('./fixtures/app-server.mjs', import.meta.url));
 const providers: CodexProvider[] = [];
@@ -17,6 +22,122 @@ function createProvider(mode = 'normal', timeout = 3_000): CodexProvider {
 
 afterEach(async () => {
   await Promise.all(providers.splice(0).map((provider) => provider.close()));
+});
+
+const turnInput: CodexTurnInput = {
+  cwd: process.cwd(),
+  prompt: 'A research question',
+  instructions: 'Answer the question.',
+  model: 'one',
+  effort: 'medium',
+  mode: 'chat',
+};
+
+describe('Codex turn execution', () => {
+  it('preserves early events, selected model/effort/search mode, and final-answer text without reasoning', async () => {
+    const provider = createProvider('early-turn');
+    const events: CodexTurnEvent[] = [];
+    const result = await provider.executeTurn(
+      { ...turnInput, model: 'two', effort: 'high', mode: 'research' },
+      (event) => events.push(event),
+    );
+    expect(result).toMatchObject({
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      status: 'completed',
+      text: 'two/high/live: A research question',
+    });
+    expect(events[0]).toEqual({ type: 'thread', threadId: 'thread-1' });
+    expect(events[1]).toEqual({ type: 'started', threadId: 'thread-1', turnId: 'turn-1' });
+    expect(
+      events.filter((event) => event.type === 'message' && event.itemId === 'answer'),
+    ).toHaveLength(1);
+    expect(events.some((event) => event.type === 'text-delta')).toBe(true);
+    expect(events.some((event) => event.type === 'progress')).toBe(true);
+    expect(JSON.stringify(events)).not.toContain('private reasoning');
+    expect(result.text).not.toContain('Checking sources');
+  });
+
+  it('isolates concurrent threads and resumes stored thread IDs with updated controls', async () => {
+    const provider = createProvider();
+    const [first, second] = await Promise.all([
+      provider.executeTurn({ ...turnInput, prompt: 'First' }, () => {}),
+      provider.executeTurn({ ...turnInput, prompt: 'Second' }, () => {}),
+    ]);
+    expect(first.threadId).not.toBe(second.threadId);
+    expect(first.text).toBe('one/medium/disabled: First');
+    expect(second.text).toBe('one/medium/disabled: Second');
+    const resumed = await provider.executeTurn(
+      { ...turnInput, threadId: first.threadId, prompt: 'Follow up', model: 'two', effort: 'low' },
+      () => {},
+    );
+    expect(resumed.threadId).toBe(first.threadId);
+    expect(resumed.text).toBe('two/low/disabled: Follow up');
+  });
+
+  it('steers a running turn and rejects duplicate turns on the same thread', async () => {
+    const provider = createProvider('turn-wait');
+    let started!: (event: Extract<CodexTurnEvent, { type: 'started' }>) => void;
+    const ready = new Promise<Extract<CodexTurnEvent, { type: 'started' }>>((resolve) => {
+      started = resolve;
+    });
+    const running = provider.executeTurn(turnInput, (event) => {
+      if (event.type === 'started') started(event);
+    });
+    const ids = await ready;
+    await expect(
+      provider.executeTurn({ ...turnInput, threadId: ids.threadId }, () => {}),
+    ).rejects.toMatchObject({ code: 'TURN_IN_PROGRESS' });
+    await provider.steerTurn(ids.threadId, ids.turnId, 'Focus on primary sources.');
+    expect((await running).text).toBe('Focus on primary sources.');
+  });
+
+  it('cancels running and pre-start turns', async () => {
+    const provider = createProvider('turn-wait');
+    const controller = new AbortController();
+    const result = await provider.executeTurn(
+      turnInput,
+      (event) => {
+        if (event.type === 'started') controller.abort();
+      },
+      controller.signal,
+    );
+    expect(result.status).toBe('interrupted');
+    await expect(
+      provider.executeTurn(turnInput, () => {}, controller.signal),
+    ).rejects.toMatchObject({ code: 'TURN_CANCELLED' });
+  });
+
+  it('rejects unsafe settings, failed turns, malformed responses, and disconnects without raw diagnostics', async () => {
+    for (const [mode, code] of [
+      ['unsafe-config', 'EXECUTION_UNAVAILABLE'],
+      ['unsafe-thread', 'EXECUTION_UNAVAILABLE'],
+      ['mcp-leak', 'EXECUTION_UNAVAILABLE'],
+      ['turn-failure', 'TURN_FAILED'],
+      ['bad-turn', 'INVALID_RESPONSE'],
+      ['turn-exit', 'CONNECTION_CLOSED'],
+    ] as const) {
+      await expect(createProvider(mode).executeTurn(turnInput, () => {})).rejects.toMatchObject({
+        code,
+        message: expect.not.stringContaining('sensitive-fixture-token'),
+      });
+    }
+  });
+
+  it('rejects an in-flight turn when the connection closes', async () => {
+    const provider = createProvider('turn-wait');
+    let started!: () => void;
+    const ready = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const running = provider.executeTurn(turnInput, (event) => {
+      if (event.type === 'started') started();
+    });
+    const rejected = expect(running).rejects.toMatchObject({ code: 'CONNECTION_CLOSED' });
+    await ready;
+    await provider.close();
+    await rejected;
+  });
 });
 
 describe('Codex subscription boundary', () => {

@@ -62,7 +62,36 @@ export type CodexErrorCode =
   | 'RPC_ERROR'
   | 'INVALID_RESPONSE'
   | 'LOGIN_IN_PROGRESS'
-  | 'NOT_SIGNED_IN';
+  | 'NOT_SIGNED_IN'
+  | 'TURN_IN_PROGRESS'
+  | 'TURN_FAILED'
+  | 'TURN_CANCELLED'
+  | 'EXECUTION_UNAVAILABLE';
+
+export interface CodexTurnInput {
+  threadId?: string;
+  cwd: string;
+  prompt: string;
+  instructions: string;
+  model: string;
+  effort: string;
+  mode: 'chat' | 'research';
+}
+
+/** Only user-visible messages and public activity cross the provider boundary. */
+export type CodexTurnEvent =
+  | { type: 'thread'; threadId: string }
+  | { type: 'started'; threadId: string; turnId: string }
+  | { type: 'text-delta'; itemId: string; delta: string }
+  | { type: 'message'; itemId: string; text: string }
+  | { type: 'progress'; message: string };
+
+export interface CodexTurnResult {
+  threadId: string;
+  turnId: string;
+  status: 'completed' | 'interrupted';
+  text: string;
+}
 
 export class CodexProviderError extends Error {
   constructor(

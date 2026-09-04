@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
 import { CodexProviderError } from './types.js';
+import { executionConfigArgs } from './execution-config.js';
 
 type PendingRequest = {
   resolve: (result: unknown) => void;
@@ -32,7 +33,7 @@ export class AppServerRpc {
   constructor(
     private readonly options: RpcOptions,
     private readonly onNotification: (method: string, params: unknown) => void,
-    private readonly onDisconnect: () => void,
+    private readonly onDisconnect: (error: CodexProviderError) => void,
   ) {}
 
   async request(method: string, params?: unknown): Promise<unknown> {
@@ -57,7 +58,7 @@ export class AppServerRpc {
   private async connect(): Promise<void> {
     const child = spawn(
       this.options.executable ?? 'codex',
-      [...(this.options.executableArgs ?? []), 'app-server'],
+      [...(this.options.executableArgs ?? []), 'app-server', ...executionConfigArgs],
       {
         cwd: this.options.cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -194,10 +195,15 @@ export class AppServerRpc {
     this.pending.delete(message.id);
     if (isRecord(message.error)) {
       const code = typeof message.error.code === 'number' ? ` (${message.error.code})` : '';
+      const experimental =
+        typeof message.error.message === 'string' &&
+        message.error.message.includes('requires experimentalApi capability');
       pending.reject(
         new CodexProviderError(
           'RPC_ERROR',
-          `Codex rejected the request${code}. Check the Codex CLI connection and retry.`,
+          experimental
+            ? 'This Codex operation requires experimental protocol support.'
+            : `Codex rejected the request${code}. Check the Codex CLI connection and retry.`,
         ),
       );
     } else if ('result' in message) {
@@ -218,7 +224,11 @@ export class AppServerRpc {
     this.pending.clear();
     child.stdin.destroy();
     child.kill('SIGKILL');
-    this.onDisconnect();
+    this.onDisconnect(error);
+  }
+
+  disconnect(error: CodexProviderError): void {
+    if (this.child) this.fail(this.child, error);
   }
 
   async close(): Promise<void> {
