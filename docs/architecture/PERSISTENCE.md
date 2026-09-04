@@ -32,7 +32,7 @@ chosen-folder/
     memory/             Reserved for future research context
 ```
 
-Project, chat, message, single-turn job, provider-thread, and activity data use a versioned JSON snapshot with atomic replacement.
+Project, chat, message, job, provider-thread, and activity data use a versioned JSON snapshot with atomic replacement.
 The `notes`, `runs`, and `memory` directories remain reserved; their presence does not imply recursive orchestration or product research memory.
 An acknowledged mutation should survive restart; malformed or unsupported data must produce a recoverable error rather than be silently overwritten.
 
@@ -74,9 +74,13 @@ If the owner process is known to be gone, the next project read marks the job an
 If a project folder disappears as a turn completes, the live coordinator retains the authorized terminal update in memory and retries it when the folder becomes available.
 This recovery does not make an in-flight provider turn resumable after server restart.
 
+## Harness checkpoints
+
+Opt-in harness runs persist a versioned stage snapshot, launch budgets, validated evidence, review gaps, and stage summaries inside the existing job record. Waiting clarification reserves the chat without a live provider worker and survives owner exit. An answer claims the run atomically under the project lock; Stop can cancel a waiting job from a new owner process. Active stages interrupted by restart are not replayed. See [the harness lifecycle](RESEARCH_HARNESS.md).
+
 ## Future evolution
 
-- Structured evidence and research-memory schemas need provenance, timestamps, authorship/source identity, and an explicit trust level.
+- Richer evidence and research-memory schemas still need verified source provenance, publication/access timestamps, authorship identity, and explicit trust levels beyond model-assigned source labels.
 - Recursive run persistence needs child-job checkpoints, cancellation propagation, and replay semantics before parallel orchestration is released.
 - Schema migrations must preserve existing data and reject newer unsupported versions clearly.
 - Backup/export, project removal, and broader recovery need user-visible policies before implementing those features.

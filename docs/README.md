@@ -11,6 +11,7 @@ Then load only the relevant document below.
 | User-selected folders and durable data     | [Persistence](architecture/PERSISTENCE.md)                       |
 | Codex authentication, models, usage, turns | [Provider boundary](architecture/CODEX_PROVIDER.md)              |
 | Frontend tokens, components, accessibility | [Design system](design/DESIGN_SYSTEM.md)                         |
+| Inspectable research graph and execution   | [Research harness](architecture/RESEARCH_HARNESS.md)             |
 | Scope, sequence, and exit criteria         | [Project plan](PROJECT_PLAN.md)                                  |
 | Why a significant decision was made        | [ADR index](adr/README.md)                                       |
 | CI, default branch, and protection setup   | [Repository administration](REPOSITORY_ADMIN.md)                 |

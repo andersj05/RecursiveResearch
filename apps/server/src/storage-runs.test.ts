@@ -124,8 +124,7 @@ describe('durable chat and research runs', () => {
       await other.createProject('Shared research', project.folderPath);
     }
     const worker = `
-      import { type HarnessState } from '@recursive-research/contracts';
-import { WorkspaceStore } from './apps/server/src/storage.ts';
+      import { WorkspaceStore } from './apps/server/src/storage.ts';
       const store = new WorkspaceStore(process.env.RR_TEST_REGISTRY);
       await store.initialize();
       try {

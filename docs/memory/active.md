@@ -4,25 +4,21 @@
 
 ## Current objective
 
-The simplified RR interface and managed single-turn Codex runtime are implemented, locally verified, and released through `dev` to `main`.
-Future product work should start from `dev` on a focused `feat/<feature>` branch.
-See [progress](progress.md) for verified capabilities and remaining limits.
+The first inspectable sequential research harness is implemented on `feat/research-harness`, based on the latest `dev`. See the [implementation plan](../plans/research-harness.md) and [harness architecture](../architecture/RESEARCH_HARNESS.md).
 
 ## Branch state
 
-`feat/project-foundation` records the implementation history, `dev` contains its integration commit, and `main` contains the promoted release.
-The three branches are published to `origin`.
-Remote branch protections have not been installed.
+The released single-turn foundation remains on `main` and `dev`. The feature branch contains frequent design, algorithm, runtime, UI, and integration checkpoints. Integration into `dev` and release promotion remain review steps.
 
 ## Immediate next actions
 
-- Begin the recursive orchestration design from the latest `dev` when that phase starts.
+- Final root validation passed all 57 tests and the production build. Review the feature PR into `dev`; release promotion is a separate step.
+- Review the new harness UX, source records, and explicit limitations before promotion.
 
 ## Next product phase
 
-Design recursive parent/child jobs, source-level provenance, bounded scheduling, cancellation propagation, and restart checkpoints before implementing multi-agent orchestration.
-Experiments remain deferred.
+Recursive parent/child scheduling, source-level verification, cancellation propagation across child jobs, and restart replay remain future work. Experiments remain deferred.
 
 ## Blockers
 
-None for local development.
+None for local implementation. Active research interrupted by restart is inspectable but not automatically replayed.

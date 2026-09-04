@@ -22,13 +22,17 @@ Research mode may use Codex's built-in web search; Chat mode may not.
 This phase is locally release-validated by the complete repository check and a separate live-account Chat and Research smoke.
 Remote CI remains a publication-time check.
 
-## 3. Recursive research orchestration
+## 3. Inspectable sequential research harness - implemented
+
+The [harness page](architecture/RESEARCH_HARNESS.md) shows the executable scope, plan, gather, review, and report graph, stage tool access, deterministic routing rules, saved evidence, and execution history. Clarification pauses durably for the user; bounded gathering repeats for unresolved gaps. Recursive delegation and independent source verification remain deferred.
+
+## 4. Recursive research orchestration
 
 Add bounded child agents, visible assignments, and durable parent/child relationships.
 Define scheduling, budgets, cancellation propagation, restart recovery, source-level provenance, and evidence reconciliation before execution.
 Require behavior tests for concurrent completion, partial failure, cancellation, steering order, and restart.
 
-## 4. Research synthesis and memory
+## 5. Research synthesis and memory
 
 Add structured source review, evidence-backed synthesis, project research memory, and richer artifact export.
 Persist provenance and trust metadata; model-generated conclusions remain reviewable.

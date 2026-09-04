@@ -1,6 +1,6 @@
 # Plan: Inspectable research harness
 
-**Status:** In progress
+**Status:** Complete
 **Last reviewed:** 2026-09-04
 **Branch:** feat/research-harness
 
@@ -34,3 +34,9 @@ Exercise malformed outputs, evidence deduplication, bounded repetition, waiting 
 ## Risks and open decisions
 
 Structured research is model-authored; links are validated and normalized but not independently verified. Provider search availability is controlled per stage. Waiting must not keep a provider process open. Stage snapshots must survive reload and preserve limits selected at launch. Active turns interrupted by restart are not automatically replayed.
+
+## Completion
+
+Implemented in frequent design, graph, server, UI, and integration commits. Final `npm run check` passes formatting, lint, both TypeScript checks, all 57 tests, and production build. A live GPT-5.4-Mini/low run completed all five stages, retained two sources, and saved a Markdown report. The live run caught and resolved an unsupported provider URI schema format.
+
+Browser fixtures verified clarification, a second gathering pass, evidence, report access, tool inspection, keyboard focus, 390-pixel layout without horizontal overflow, and restoration of the selected run after reload. Waiting-owner recovery and atomic answer claims are covered by storage tests. Live clarification/cancellation, recursive orchestration, independent citation verification, and automatic stage replay are not claimed.

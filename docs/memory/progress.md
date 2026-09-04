@@ -4,15 +4,18 @@
 
 ## Implementation status
 
-The local application foundation and managed single-turn runtime are implemented on `feat/project-foundation`.
-The workspace includes the simplified Portfolio-derived RR interface, local backend, shared schemas, durable job storage, restricted Codex adapter, provider-neutral harness guidance, contributor memory, six ADRs, CI, and review templates.
+The released foundation is on `main` and `dev`. The first inspectable sequential harness is implemented on `feat/research-harness`; see [its architecture and validation](../architecture/RESEARCH_HARNESS.md).
 
 ## Implemented capabilities
 
 - Projects connect to existing folders; nested chats, messages, jobs, events, and report paths persist in project-owned metadata.
 - The home and conversation views remove ornamental labels and repeated explanations, use the `RR` mark, and keep real projects and primary actions central.
 - Configuration reuses the managed Codex subscription and presents actual account, model, supported-thinking, and usage state.
-- Each submission can run in Chat or Research mode with per-turn model and thinking selection.
+- Each conversation submission can run in Chat or focused Research mode with per-turn model and thinking selection.
+- The dedicated Research harness page exposes the executable graph, tool availability, decision rules, launch budgets, clarification, stage history, evidence, and reports.
+- Harness jobs execute scope, plan, gather, review, and report stages. The server enforces one to five gathering rounds and one to forty retained normalized sources.
+- Clarification pauses durably, reserves its chat, releases execution capacity, and resumes through an atomic answer claim after reload or restart.
+- Only gathering enables web research. All stages preserve the restricted read-only provider boundary.
 - Assistant output streams into a durable placeholder; the active turn supports stop and accepted in-turn steering.
 - Later messages resume the chat's stored Codex thread.
 - A completed Research answer is saved once as `artifacts/research-<run-id>.md` and can be opened from the result or Files surface.
@@ -22,7 +25,16 @@ The workspace includes the simplified Portfolio-derived RR interface, local back
 - Provider reasoning, tool arguments, and raw diagnostics do not cross the adapter boundary.
 - Stale active jobs are marked interrupted after their owner process exits, and partial assistant output is retained.
 
-## Verification completed
+## Harness verification completed
+
+- Final root `npm run check` passed formatting, lint, strict TypeScript, 57 tests, and production build.
+- Seven algorithm tests, fifteen provider fixtures, fourteen coordinator tests, eight storage-run tests, and existing API/cross-process tests passed.
+- A live GPT-5.4-Mini/low run completed scope, plan, gather, review, and report; retained two sources; and saved a Markdown artifact.
+- Live integration exposed the provider's unsupported URI schema format; the provider schema now omits it while local HTTP(S) validation remains intact.
+- Browser fixture checks verified clarification, a second evidence pass, source inspection, report rendering, tool descriptions, keyboard focus, 390-pixel responsive layout without horizontal overflow, and saved-run restoration after reload.
+- Clarification and cancellation are fixture-verified; only the five-stage non-pausing path is live-verified.
+
+## Foundation verification completed
 
 - Frontend formatting, TypeScript, and lint checks pass for the simplified interface and runtime controls.
 - Fourteen provider fixtures pass for account/protocol behavior, new and resumed turns, streaming, research progress, steering, cancellation, final-answer filtering, malformed responses, and process-local restrictions.
@@ -44,9 +56,9 @@ No remote CI result is claimed until GitHub Actions completes, and branch protec
 
 ## Deliberate limitations
 
-- A job runs one managed Codex turn; recursive child agents, automatic evidence reconciliation, and experiments are not implemented.
-- Research reports are model-authored Markdown with ordinary links, not a structured or independently verified citation database.
-- An application restart interrupts an in-flight turn; partial output and the provider thread remain available for a later user message.
+- Chat and focused Research run one turn; harness jobs run bounded sequential stages. Recursive child agents, automatic evidence reconciliation, and experiments are not implemented.
+- Harness source records and reports are model-authored. Normalization and schema validation do not independently verify sources, claims, or citations.
+- An application restart interrupts active execution; partial output and valid checkpoints remain available. Waiting clarification survives restart. Automatic stage replay is not implemented.
 - Codex availability depends on a local supported Codex installation, account access, and remaining usage.
 - Cross-process writer coordination is verified on the local filesystem; network or cloud-synchronized filesystem guarantees are not established.
 - Browser login and cancellation are fixture-verified rather than live-verified.

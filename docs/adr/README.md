@@ -3,14 +3,15 @@
 ADRs explain decisions that are expensive to reverse, cross package boundaries, or constrain future implementations.
 They record intent and rationale; [progress](../memory/progress.md) records verified implementation.
 
-| ID                                                 | Decision                             | Status   |
-| -------------------------------------------------- | ------------------------------------ | -------- |
-| [0001](0001-use-local-typescript-workspace.md)     | Local TypeScript workspace           | Accepted |
-| [0002](0002-use-repository-native-memory.md)       | Repository-native contributor memory | Accepted |
-| [0003](0003-use-main-dev-feature-branches.md)      | Main, dev, and feature branches      | Accepted |
-| [0004](0004-use-managed-codex-app-server.md)       | Managed Codex app-server connection  | Accepted |
-| [0005](0005-use-project-folder-storage.md)         | Project-owned local folder storage   | Accepted |
-| [0006](0006-run-restricted-managed-codex-turns.md) | Restricted managed Codex turns       | Accepted |
+| ID                                                 | Decision                                | Status   |
+| -------------------------------------------------- | --------------------------------------- | -------- |
+| [0001](0001-use-local-typescript-workspace.md)     | Local TypeScript workspace              | Accepted |
+| [0002](0002-use-repository-native-memory.md)       | Repository-native contributor memory    | Accepted |
+| [0003](0003-use-main-dev-feature-branches.md)      | Main, dev, and feature branches         | Accepted |
+| [0004](0004-use-managed-codex-app-server.md)       | Managed Codex app-server connection     | Accepted |
+| [0005](0005-use-project-folder-storage.md)         | Project-owned local folder storage      | Accepted |
+| [0006](0006-run-restricted-managed-codex-turns.md) | Restricted managed Codex turns          | Accepted |
+| [0007](0007-inspectable-sequential-harness.md)     | Inspectable sequential research harness | Accepted |
 
 Copy [the template](0000-template.md) to the next available four-digit number and a short kebab-case name.
 Resolve number ownership before parallel agents add decisions.

@@ -37,7 +37,7 @@ Do not turn a quota window into an invented dollar cost.
 
 ## Managed turn policy
 
-Every Chat or Research submission starts one Codex turn and consumes the connected account's available usage.
+Chat and focused Research submissions each start one Codex turn. The opt-in harness executes multiple bounded stages, each consuming the connected account's available usage.
 The server validates the requested model and thinking level against the current account before creating the turn.
 The provider resumes the chat's existing Codex thread when possible.
 
@@ -72,8 +72,8 @@ An installed-Codex metadata probe verifies account connectivity separately from 
 A native execution-policy probe verifies the process-local restrictions, read-only sandbox, no-approval policy, and absence of external MCP tools without consuming an inference turn.
 Live model output still requires a separately reported live smoke because fixtures and metadata checks do not consume account usage.
 
-The current runtime starts a single Codex turn for each job.
-It does not implement recursive child agents, autonomous experiment execution, structured source extraction, or independent citation validation.
+The [sequential harness](RESEARCH_HARNESS.md) uses isolated stage threads and per-turn output schemas, with web research enabled only for gathering. Structured sources are validated by the application; the provider schema omits its unsupported URI format.
+The runtime does not implement recursive child agents, autonomous experiments, or independent citation validation.
 CLI availability and account access failures leave the rest of the workspace usable.
 
 Protocol reference: [official Codex app-server documentation](https://learn.chatgpt.com/docs/app-server), reviewed 2026-09-04.

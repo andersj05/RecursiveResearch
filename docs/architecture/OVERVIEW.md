@@ -12,7 +12,7 @@ The browser presents projects, chats, job output, files, configuration, and conn
 | `apps/server`             | Local API, validation, project registry, durable state, run coordination, provider lifecycle, event delivery | React UI or raw provider payloads in public contracts            |
 | `packages/contracts`      | Shared schemas, DTOs, job and event types, validated configuration                                           | Browser, storage, or provider implementation dependencies        |
 | `packages/codex-provider` | Official Codex app-server subprocess, account metadata, restricted turn execution, and protocol adaptation   | Research policy, durable project state, or browser presentation  |
-| `packages/harness`        | Provider-neutral turn guidance and contracts for future recursive orchestration                              | Provider credentials, filesystem access, or the live process map |
+| `packages/harness`        | Provider-neutral stage graph, research algorithms, guidance, and future recursive contracts                  | Provider credentials, filesystem access, or the live process map |
 
 Dependencies point inward to contracts.
 The server composes storage, coordinator, and provider adapters; the frontend uses only the local server API.
@@ -32,7 +32,7 @@ Use explicit dependency injection at process boundaries so fixtures can replace 
 The selected Codex thread identifier is saved on the chat so later turns resume the provider conversation.
 Legacy chat messages are supplied as bounded context only when no Codex thread has been established.
 One chat can own only one active job, and a configurable application limit bounds independent jobs across chats.
-This is concurrent single-turn execution, not recursive agent orchestration.
+Chat and focused Research use single-turn execution. The opt-in [Research harness](RESEARCH_HARNESS.md) executes a bounded sequential graph with durable clarification and evidence checkpoints. Neither path implements recursive child agents.
 
 ## Execution boundary
 
@@ -58,7 +58,7 @@ Do not turn the local API into an unauthenticated network service by changing on
 The current coordinator owns one provider turn per job, durable lifecycle changes, streaming, stop, steering, and report publication.
 `packages/harness` supplies the current turn instructions and preserves provider-neutral contracts for a later orchestrator.
 
-A recursive harness still needs explicit assignment trees, bounded child-agent scheduling, cancellation propagation, durable checkpoints, source-level provenance, evidence reconciliation, and restart semantics.
+The sequential harness now supplies scope, planning, evidence gathering, gap review, and report stages. Recursive orchestration still needs explicit assignment trees, bounded child-agent scheduling, cancellation propagation, durable checkpoints, source-level provenance, evidence reconciliation, and restart semantics.
 Experiments remain outside the research workflow.
 Add those capabilities through focused contracts and ADRs without giving model-authored content authority over the repository or selected folder.
 

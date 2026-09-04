@@ -4,7 +4,7 @@
 
 RecursiveResearch is a local research workspace for organizing projects and chats, running managed Codex chat or research jobs, inspecting incoming output, and steering active work.
 Projects connect to user-selected folders that own their conversations, job history, and research reports.
-The long-term product goal is recursive parallel research; the current runtime executes one Codex turn per job.
+The long-term product goal is recursive parallel research. Chat and focused Research use one turn per job; the opt-in Research harness executes a bounded sequential graph.
 
 ## Durable constraints
 
@@ -14,7 +14,7 @@ The long-term product goal is recursive parallel research; the current runtime e
 - Let each turn select an account-visible model and supported thinking level; preserve a chat's provider thread for continuity.
 - Persist user messages, streamed output, lifecycle state, and research reports in the connected project folder.
 - Keep the execution process read-only and non-interactive; external tools, project instructions, and multi-agent delegation stay disabled.
-- Preserve a provider-neutral recursive harness seam independent of React and provider-specific APIs.
+- Keep the executable stage graph, research algorithms, and guidance provider-neutral and independent of React.
 - Treat provenance, cancellation propagation, bounded parallelism, restart recovery, and evidence reconciliation as requirements for the future recursive harness.
 - Keep research data and repository contributor memory separate.
 - Use `main -> dev -> feat/<feature>` and frequent conventional commits.
@@ -23,6 +23,7 @@ The long-term product goal is recursive parallel research; the current runtime e
 ## Scope boundary
 
 The current product can run a managed Chat turn or a focused web Research turn, stream its answer, stop or steer it, and save a completed Research answer as Markdown.
-It does not spawn recursive child agents, conduct experiments, extract structured evidence, independently validate citations, or give a model write access to the selected folder.
+The Research harness adds durable clarification, planning, bounded evidence gathering, gap review, structured source records, and a saved report with an inspectable graph.
+It does not spawn recursive child agents, conduct experiments, independently validate citations, or give a model write access to the selected folder.
 
-[Architecture](../architecture/OVERVIEW.md) · [Roadmap](../PROJECT_PLAN.md) · [Decisions](../adr/README.md)
+[Research harness](../architecture/RESEARCH_HARNESS.md) � [Architecture](../architecture/OVERVIEW.md) · [Roadmap](../PROJECT_PLAN.md) · [Decisions](../adr/README.md)
