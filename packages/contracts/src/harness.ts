@@ -37,7 +37,7 @@ export const reviewOutputSchema = z
     gaps: z.array(shortText).max(6),
   })
   .strict();
-export const harnessStateSchema = z.object({
+export const sequentialHarnessStateSchema = z.object({
   version: z.literal(1),
   stage: harnessStageSchema,
   brief: z.string().min(1).max(50000),
@@ -63,7 +63,7 @@ export const harnessStateSchema = z.object({
     .max(15),
   stopReason: z.string().max(500).nullable(),
 });
-export type HarnessState = z.infer<typeof harnessStateSchema>;
+export type SequentialHarnessState = z.infer<typeof sequentialHarnessStateSchema>;
 export const harnessOptionsSchema = z
   .object({
     maxRounds: z.number().int().min(1).max(5),

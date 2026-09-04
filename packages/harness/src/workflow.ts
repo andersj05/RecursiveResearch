@@ -4,7 +4,7 @@ import {
   gatherOutputSchema,
   reviewOutputSchema,
   type HarnessStage,
-  type HarnessState,
+  type SequentialHarnessState as HarnessState,
 } from '@recursive-research/contracts';
 
 /** Shared with the inspector: these are the stages actually executed by the server. */

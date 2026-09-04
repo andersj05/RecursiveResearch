@@ -1,3 +1,4 @@
+export { codexLaunchCommand } from './rpc.js';
 import { AppServerRpc, isRecord, type RpcOptions } from './rpc.js';
 import { executionConfig } from './execution-config.js';
 import { TurnExecution } from './turn.js';

@@ -1,6 +1,13 @@
-import { harnessOptionsSchema, harnessStateSchema } from './harness.js';
+import { harnessOptionsSchema, sequentialHarnessStateSchema } from './harness.js';
+import { adaptiveHarnessStateSchema, adaptiveOptionsSchema } from './orchestration.js';
+export * from './orchestration.js';
 export * from './harness.js';
 import { z } from 'zod';
+export const harnessStateSchema = z.discriminatedUnion('version', [
+  sequentialHarnessStateSchema,
+  adaptiveHarnessStateSchema,
+]);
+export type HarnessState = z.infer<typeof harnessStateSchema>;
 
 export const idSchema = z.uuid();
 const timestamp = z.iso.datetime();
@@ -128,7 +135,7 @@ export const startRunSchema = z
   .object({
     content: createMessageSchema.shape.content,
     mode: runModeSchema.default('chat'),
-    harness: harnessOptionsSchema.optional(),
+    harness: z.union([harnessOptionsSchema, adaptiveOptionsSchema]).optional(),
     model: z.string().min(1).max(200).nullable().default(null),
     reasoningEffort: z.string().min(1).max(40).nullable().default(null),
   })

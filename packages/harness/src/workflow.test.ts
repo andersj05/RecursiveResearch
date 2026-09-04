@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   harnessStateSchema,
   stageOutputSchema,
-  type HarnessState,
+  type SequentialHarnessState as HarnessState,
 } from '@recursive-research/contracts';
 import { advanceHarness, normalizeSourceUrl, researchGraph } from './workflow.js';
 

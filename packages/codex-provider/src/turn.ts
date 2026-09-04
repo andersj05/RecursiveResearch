@@ -1,3 +1,4 @@
+import { projectWebTool } from './web-tool.js';
 import { isRecord, type AppServerRpc } from './rpc.js';
 import { CodexProviderError, type CodexTurnEvent, type CodexTurnResult } from './types.js';
 
@@ -103,6 +104,8 @@ export class TurnExecution {
     if (item.type === 'agentMessage' && method === 'item/completed') {
       this.readMessage(item);
     } else if (item.type === 'webSearch') {
+      const call = projectWebTool(item, method === 'item/started' ? 'started' : 'completed');
+      if (call) this.emit({ type: 'web-tool', call });
       this.emit({
         type: 'progress',
         message: method === 'item/started' ? 'Searching the web' : 'Sources reviewed',
