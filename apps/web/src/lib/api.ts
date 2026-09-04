@@ -3,6 +3,7 @@ import type {
   Chat,
   ChatDetail,
   HarnessConfig,
+  HarnessRuntime,
   Message,
   Project,
   Run,
@@ -53,6 +54,7 @@ export function describeError(error: unknown): string {
 }
 
 export const api = {
+  harnessRuntime: () => request<HarnessRuntime>('/harness/runtime'),
   workspace: () => request<Workspace>('/workspace'),
   chat: (id: string) => request<ChatDetail>(`/chats/${encodeURIComponent(id)}`),
   artifacts: (projectId: string) =>

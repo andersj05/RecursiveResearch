@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   isActiveRun,
+  defaultAdaptiveOptions,
   type Chat,
   type HarnessConfig,
   type Project,
@@ -12,10 +13,12 @@ import { useConversation } from '../hooks/useConversation';
 import { ConversationMessages, formatTime } from './ConversationMessages';
 import { Icon } from './Icon';
 import { ModelControls } from './ModelControls';
+import { AdaptiveDashboard } from './AdaptiveDashboard';
 
-type WorkspaceTab = 'conversation' | 'activity' | 'files';
+type WorkspaceTab = 'conversation' | 'orchestration' | 'activity' | 'files';
 const tabs = [
   { id: 'conversation', label: 'Conversation', icon: 'chat' },
+  { id: 'orchestration', label: 'Orchestration', icon: 'activity' },
   { id: 'activity', label: 'Activity', icon: 'activity' },
   { id: 'files', label: 'Files', icon: 'file' },
 ] as const;
@@ -63,6 +66,7 @@ export function ResearchWorkspace({
   } = useConversation(project.id, chat?.id, revision);
   const provider = useCodexModels();
   const activeRun = detail?.runs.find(isActiveRun);
+  const researchRun = detail?.runs.filter((run) => run.harness?.version === 2).at(-1);
   const selectedMode = activeRun?.mode ?? mode;
   const latestProgress = activeRun
     ? [...(detail?.events ?? [])].reverse().find((event) => event.runId === activeRun.id)?.summary
@@ -125,7 +129,9 @@ export function ResearchWorkspace({
           mode,
           model,
           reasoningEffort: supportedEffort,
+          ...(mode === 'research' ? { harness: defaultAdaptiveOptions } : {}),
         });
+        if (mode === 'research') setTab('orchestration');
         onChatCreated(target);
       }
       setDraft('');
@@ -224,6 +230,11 @@ export function ResearchWorkspace({
           <span role="status">
             {latestProgress ?? (activeRun.status === 'queued' ? 'Starting…' : 'Working…')}
           </span>
+          {tab !== 'conversation' && (
+            <button className="text-button" type="button" onClick={() => setTab('conversation')}>
+              {activeRun.status === 'waiting' ? 'Answer question' : 'Add direction'}
+            </button>
+          )}
           <button
             className="button small"
             type="button"
@@ -302,7 +313,11 @@ export function ResearchWorkspace({
                   }
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
-                  maxLength={50000}
+                  maxLength={
+                    activeRun?.harness?.version === 2 && activeRun.status !== 'waiting'
+                      ? 4000
+                      : 50000
+                  }
                   rows={3}
                   disabled={busy || !project.available}
                   onKeyDown={(event) => {
@@ -369,6 +384,14 @@ export function ResearchWorkspace({
               </form>
             </>
           )}
+          {tab === 'orchestration' &&
+            (researchRun?.harness?.version === 2 ? (
+              <AdaptiveDashboard key={researchRun.id} state={researchRun.harness} />
+            ) : (
+              <p className="section-empty">
+                Start a research job to see delegated agents and tool calls.
+              </p>
+            ))}
           {tab === 'activity' && (
             <div className="activity-view">
               {detail?.events.length ? (

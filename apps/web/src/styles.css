@@ -2342,3 +2342,401 @@ h3 {
     padding-left: 24px;
   }
 }
+/* Adaptive research: a compact operational surface with progressive inspection. */
+.architecture-disclosure {
+  margin: 20px 0;
+}
+.architecture-disclosure > summary,
+.expert-details > summary,
+.working-synthesis > summary {
+  cursor: pointer;
+  font: 12px var(--mono);
+  padding: 14px 0;
+}
+.harness-technical {
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.adaptive-topology {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  padding: 26px 22px 16px;
+}
+.adaptive-topology button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 14px;
+  font: 12px var(--mono);
+}
+.adaptive-topology button:not(:nth-child(5))::after {
+  content: '→';
+  position: absolute;
+  right: -15px;
+  top: 26px;
+  color: var(--muted);
+}
+.adaptive-topology button[aria-pressed='true'] {
+  background: var(--terminal-soft);
+  border-color: var(--terminal);
+}
+.adaptive-topology button span {
+  color: var(--muted);
+  font-size: 10px;
+}
+.topology-return {
+  grid-column: 2 / 5;
+  border: 1px solid var(--terminal);
+  border-top: 0;
+  padding: 8px;
+  text-align: center;
+  color: var(--terminal);
+  font: 10px var(--mono);
+}
+.topology-detail {
+  padding: 0 22px 20px;
+}
+.topology-detail h3,
+.expert-details h3,
+.working-synthesis h3 {
+  font: 12px var(--mono);
+}
+.topology-detail p {
+  max-width: 850px;
+}
+.topology-detail code {
+  font-size: 11px;
+  color: var(--terminal);
+}
+.harness-technical > .expert-details {
+  border-top: 1px solid var(--line);
+  padding: 0 22px 10px;
+}
+.expert-details p {
+  font-size: 12px;
+  color: var(--muted);
+}
+.expert-details pre,
+.tool-trace pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 380px;
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  font: 11px/1.65 var(--mono);
+}
+.adaptive-budget-controls {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.adaptive-dashboard {
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.orchestration-metrics {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  border-bottom: 1px solid var(--line);
+}
+.orchestration-metrics > div {
+  padding: 20px 16px;
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.orchestration-metrics > div:last-child {
+  border-right: 0;
+}
+.orchestration-metrics strong {
+  font: 20px var(--mono);
+  color: var(--terminal);
+}
+.orchestration-metrics span {
+  font: 10px var(--mono);
+  color: var(--muted);
+}
+.orchestration-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+}
+.orchestration-toolbar .harness-detail-tabs {
+  margin: 0;
+  border: 0;
+}
+.orchestration-toolbar > span {
+  font: 10px var(--mono);
+  color: var(--muted);
+  padding-bottom: 8px;
+}
+.agent-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.agent-tree {
+  min-height: 270px;
+  max-height: 480px;
+  overflow: auto;
+  border-right: 1px solid var(--line);
+}
+.agent-row {
+  display: block;
+  width: 100%;
+  padding: 14px 16px;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-left: 3px solid transparent;
+  background: transparent;
+}
+.agent-row[aria-pressed='true'] {
+  background: var(--terminal-soft);
+  border-left-color: var(--terminal);
+}
+.agent-row.status-running {
+  border-left-color: var(--terminal);
+}
+.agent-row.status-failed,
+.agent-row.status-interrupted {
+  border-left-color: var(--amber);
+}
+.agent-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 5px;
+  margin-bottom: 7px;
+  color: var(--terminal);
+  font: 10px var(--mono);
+}
+.agent-row strong {
+  font-size: 12px;
+  font-weight: 500;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.agent-row small {
+  display: block;
+  color: var(--muted);
+  font: 10px var(--mono);
+  margin-top: 7px;
+}
+.agent-inspector {
+  min-width: 0;
+  padding: 20px;
+  max-height: 480px;
+  overflow: auto;
+}
+.agent-inspector > .harness-section-heading {
+  background: transparent;
+  color: var(--terminal);
+  padding: 0;
+}
+.agent-inspector h3 {
+  font: 12px/1.5 var(--mono);
+  margin: 0 0 14px;
+}
+.agent-inspector p {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.agent-summary {
+  border-left: 2px solid var(--terminal);
+  padding-left: 12px;
+}
+.agent-facts {
+  font-size: 11px;
+  margin: 20px 0;
+}
+.agent-facts > div {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.agent-facts dt {
+  color: var(--muted);
+}
+.agent-facts dd {
+  margin: 0;
+  font: 10px/1.5 var(--mono);
+  overflow-wrap: anywhere;
+}
+.trace-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+.trace-heading label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font: 11px var(--mono);
+}
+.trace-heading select {
+  max-width: 220px;
+  padding: 7px;
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.trace-heading > span {
+  font: 10px var(--mono);
+  color: var(--muted);
+}
+.tool-trace ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 480px;
+  overflow: auto;
+}
+.tool-trace li {
+  border-top: 1px solid var(--line);
+  padding: 0 16px;
+}
+.tool-trace summary {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 12px;
+  cursor: pointer;
+  padding: 14px 0;
+}
+.tool-action {
+  font: 11px var(--mono);
+  color: var(--terminal);
+}
+.tool-target {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.tool-trace small {
+  font: 10px var(--mono);
+  color: var(--muted);
+}
+.loop-decisions {
+  padding: 0 20px 16px;
+}
+.loop-decisions ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.loop-decisions li {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.loop-decisions strong {
+  font: 12px var(--mono);
+  color: var(--terminal);
+}
+.loop-decisions p {
+  font-size: 12px;
+}
+.loop-decisions small {
+  font: 10px var(--mono);
+  color: var(--muted);
+}
+.working-synthesis {
+  border-top: 1px solid var(--line);
+  padding: 0 20px;
+}
+.working-synthesis summary span {
+  font-size: 10px;
+  color: var(--muted);
+  margin-left: 12px;
+}
+.working-synthesis p,
+.working-synthesis li {
+  font-size: 12px;
+}
+.source-observations {
+  margin-top: 10px;
+  font-size: 11px;
+}
+.source-observations summary {
+  cursor: pointer;
+  color: var(--terminal);
+}
+@media (max-width: 900px) {
+  .orchestration-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .orchestration-metrics > div:nth-child(-n + 3) {
+    border-bottom: 1px solid var(--line);
+  }
+  .orchestration-metrics > div:nth-child(3n) {
+    border-right: 0;
+  }
+  .adaptive-budget-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .agent-workbench {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .agent-tree {
+    max-height: 330px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .agent-inspector {
+    max-height: none;
+  }
+  .adaptive-topology {
+    gap: 8px;
+    padding: 16px 10px;
+  }
+  .adaptive-topology button {
+    padding: 9px 5px;
+    font-size: 9px;
+  }
+  .adaptive-topology button:not(:nth-child(5))::after {
+    right: -9px;
+    font-size: 9px;
+  }
+  .topology-return {
+    grid-column: 1 / -1;
+    font-size: 9px;
+  }
+  .tool-trace summary {
+    grid-template-columns: 75px minmax(0, 1fr);
+    gap: 8px;
+  }
+  .tool-trace small {
+    grid-column: 2;
+  }
+  .orchestration-metrics strong {
+    font-size: 16px;
+  }
+  .orchestration-metrics > div {
+    padding: 14px 10px;
+  }
+  .working-synthesis summary span {
+    display: block;
+    margin: 8px 0 0;
+  }
+}

@@ -1,9 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { isActiveRun, type Project, type Workspace } from '@recursive-research/contracts';
+import {
+  defaultAdaptiveOptions,
+  isActiveRun,
+  type Project,
+  type Workspace,
+} from '@recursive-research/contracts';
 import { useCodexModels } from '../hooks/useCodexModels';
 import { useConversation } from '../hooks/useConversation';
 import { api, describeError } from '../lib/api';
 import { HarnessGraph } from './HarnessGraph';
+import { HarnessTechnical } from './HarnessTechnical';
+import { AdaptiveDashboard } from './AdaptiveDashboard';
 import { ModelControls } from './ModelControls';
 import { ConversationMessages, formatTime } from './ConversationMessages';
 import { Icon } from './Icon';
@@ -33,7 +40,7 @@ export function HarnessPage(props: Props) {
       <div className="harness-page-heading">
         <div>
           <h1>Research harness</h1>
-          <p>Research with a saved evidence trail.</p>
+          <p>Delegate, investigate, and follow the evidence.</p>
         </div>
         <label className="harness-project-select">
           Project
@@ -54,7 +61,7 @@ export function HarnessPage(props: Props) {
         <HarnessSession key={project.id} {...props} project={project} />
       ) : (
         <>
-          <HarnessGraph />
+          <HarnessTechnical />
           <div className="harness-empty">
             <p>Choose a project folder to keep your research and reports together.</p>
             <button className="button primary" type="button" onClick={props.onCreateProject}>
@@ -88,8 +95,9 @@ function HarnessSession({
   const [answer, setAnswer] = useState('');
   const [model, setModel] = useState(workspace.settings.model);
   const [effort, setEffort] = useState(workspace.settings.reasoningEffort);
-  const [maxRounds, setMaxRounds] = useState(Math.min(workspace.settings.maxDepth, 5));
-  const [maxSources, setMaxSources] = useState(Math.min(workspace.settings.maxSourcesPerAgent, 40));
+  const [maxRounds, setMaxRounds] = useState(defaultAdaptiveOptions.maxRounds);
+  const [maxSources, setMaxSources] = useState(defaultAdaptiveOptions.maxSources);
+  const [limits, setLimits] = useState(defaultAdaptiveOptions);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<'evidence' | 'steps' | 'report'>('steps');
@@ -127,7 +135,7 @@ function HarnessSession({
         )
           ? effort
           : null,
-        harness: { maxRounds, maxSources },
+        harness: { ...limits, maxRounds, maxSources },
       });
       setChatId(id);
       setDraft('');
@@ -159,7 +167,10 @@ function HarnessSession({
   }
   return (
     <>
-      <HarnessGraph run={run} />
+      <details className="architecture-disclosure">
+        <summary>Architecture & runtime</summary>
+        {state?.version === 1 ? <HarnessGraph run={run} /> : <HarnessTechnical />}
+      </details>
       <div className="harness-session-heading">
         <h2>{chatId ? 'Research run' : 'New research'}</h2>
         <label>
@@ -230,13 +241,13 @@ function HarnessSession({
               compact
             />
             <label>
-              Gathering rounds
+              Research cycles
               <select
                 value={maxRounds}
                 onChange={(event) => setMaxRounds(Number(event.target.value))}
                 disabled={busy}
               >
-                {[1, 2, 3, 4, 5].map((value) => (
+                {[1, 2, 3, 4, 5, 6, 8, 10, 12].map((value) => (
                   <option key={value}>{value}</option>
                 ))}
               </select>
@@ -245,8 +256,8 @@ function HarnessSession({
               Retained sources
               <input
                 type="number"
-                min={1}
-                max={40}
+                min={2}
+                max={500}
                 value={maxSources}
                 onChange={(event) => setMaxSources(Number(event.target.value))}
                 required
@@ -262,8 +273,37 @@ function HarnessSession({
               <Icon name="arrow" size={14} />
             </button>
           </div>
+          <details className="expert-details">
+            <summary>Delegation & time limits</summary>
+            <div className="adaptive-budget-controls">
+              {(
+                [
+                  ['maxAgents', 'Parallel agents', 1, 6],
+                  ['maxTasks', 'Research assignments', 2, 48],
+                  ['maxDepth', 'Branch depth', 1, 8],
+                  ['maxMinutes', 'Time limit (minutes)', 1, 120],
+                ] as const
+              ).map(([key, label, min, max]) => (
+                <label key={key}>
+                  {label}
+                  <input
+                    type="number"
+                    min={min}
+                    max={max}
+                    value={limits[key]}
+                    required
+                    disabled={busy}
+                    onChange={(event) =>
+                      setLimits({ ...limits, [key]: Number(event.target.value) })
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+          </details>
           <p className="harness-budget-note">
-            Up to {3 + 2 * maxRounds} model turns, plus your clarification if needed.{' '}
+            Up to {limits.maxTasks + 2 + maxRounds} model turns · {limits.maxAgents} parallel agents
+            · {limits.maxMinutes} minutes.{' '}
             {workspace.settings.requirePrimarySources
               ? 'Primary sources preferred.'
               : 'Primary and secondary sources.'}
@@ -351,19 +391,25 @@ function HarnessSession({
                   void act('steer');
                 }}
               >
-                <label htmlFor="harness-steer">Guidance for the current stage</label>
+                <label htmlFor="harness-steer">
+                  Guidance for active agents and subsequent assignments
+                </label>
                 <textarea
                   id="harness-steer"
                   value={answer}
                   onChange={(event) => setAnswer(event.target.value)}
                   rows={2}
-                  maxLength={50000}
+                  maxLength={state?.version === 2 ? 4000 : 50000}
                   required
                 />
                 <button
                   className="button small"
                   disabled={
-                    busy || !answer.trim() || !run.turnId || !connected || !project.available
+                    busy ||
+                    !answer.trim() ||
+                    (state?.version !== 2 && !run.turnId) ||
+                    !connected ||
+                    !project.available
                   }
                 >
                   Send update
@@ -381,14 +427,19 @@ function HarnessSession({
                 onClick={() => setDetailTab(tab)}
               >
                 {tab === 'steps'
-                  ? 'Execution log'
+                  ? state?.version === 2
+                    ? 'Orchestration'
+                    : 'Execution log'
                   : tab === 'evidence'
                     ? `Evidence (${state?.sources.length ?? 0})`
                     : 'Report'}
               </button>
             ))}
           </div>
-          {detailTab === 'steps' && (
+          {detailTab === 'steps' && state?.version === 2 && (
+            <AdaptiveDashboard key={run.id} state={state} />
+          )}
+          {detailTab === 'steps' && state?.version !== 2 && (
             <div className="harness-log">
               {state?.steps.length ? (
                 <ol>
@@ -438,6 +489,16 @@ function HarnessSession({
                           {new URL(source.url).hostname} ·{' '}
                           {source.primary ? 'Primary' : 'Secondary'} · Round {source.round}
                         </small>
+                        {'observations' in source && Array.isArray(source.observations) && (
+                          <details className="source-observations">
+                            <summary>{source.observations.length} agent observations</summary>
+                            {source.observations.map((observation) => (
+                              <p key={observation.taskId}>
+                                <strong>{observation.taskId}</strong> · {observation.finding}
+                              </p>
+                            ))}
+                          </details>
+                        )}
                       </div>
                     </li>
                   ))}
