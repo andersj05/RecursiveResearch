@@ -1,5 +1,9 @@
 import { harnessOptionsSchema, sequentialHarnessStateSchema } from './harness.js';
-import { adaptiveHarnessStateSchema, adaptiveOptionsSchema } from './orchestration.js';
+import {
+  adaptiveHarnessStateSchema,
+  adaptiveOptionsSchema,
+  defaultAdaptiveOptions,
+} from './orchestration.js';
 export * from './orchestration.js';
 export * from './harness.js';
 import { z } from 'zod';
@@ -9,6 +13,7 @@ export const harnessStateSchema = z.discriminatedUnion('version', [
 ]);
 export type HarnessState = z.infer<typeof harnessStateSchema>;
 
+export const applicationApiVersion = 2;
 export const idSchema = z.uuid();
 const timestamp = z.iso.datetime();
 
@@ -77,6 +82,7 @@ export const harnessConfigSchema = z
     maxSourcesPerAgent: z.number().int().min(1).max(100),
     instructions: z.string().max(20000),
     requirePrimarySources: z.boolean(),
+    research: adaptiveOptionsSchema.default(defaultAdaptiveOptions),
   })
   .strict();
 export type HarnessConfig = z.infer<typeof harnessConfigSchema>;
@@ -90,6 +96,7 @@ export const defaultHarnessConfig: HarnessConfig = {
   instructions:
     'Prefer primary sources. Record citations, distinguish evidence from inference, and surface open questions.',
   requirePrimarySources: true,
+  research: defaultAdaptiveOptions,
 };
 
 export const createProjectSchema = z

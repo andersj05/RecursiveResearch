@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { EventEmitter } from 'node:events';
 import { z, ZodError } from 'zod';
 import {
+  applicationApiVersion,
   createProjectSchema,
   createChatSchema,
   createMessageSchema,
@@ -141,6 +142,7 @@ export async function createApp(options: AppOptions = {}) {
   app.get('/api/health', async () => ({
     status: 'ok',
     version: '0.1.0',
+    apiVersion: applicationApiVersion,
     harness: harnessCapabilities,
   }));
   app.get('/api/harness/runtime', async () => ({

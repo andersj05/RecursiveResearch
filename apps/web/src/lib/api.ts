@@ -1,3 +1,4 @@
+import { applicationApiVersion } from '@recursive-research/contracts';
 import type {
   Artifact,
   Chat,
@@ -12,6 +13,13 @@ import type {
 } from '@recursive-research/contracts';
 
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  if (options.method && !['GET', 'HEAD'].includes(options.method.toUpperCase())) {
+    const server = await request<{ apiVersion?: number }>('/health');
+    if (server.apiVersion !== applicationApiVersion)
+      throw new Error(
+        'The page and local server are running different app versions. Restart RecursiveResearch, then reload this page.',
+      );
+  }
   let response: Response;
   try {
     response = await fetch(`/api${path}`, {
