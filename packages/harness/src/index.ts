@@ -1,3 +1,4 @@
+export * from './workflow.js';
 import type { HarnessConfig, ResearchEvent, RunMode } from '@recursive-research/contracts';
 
 /** Contract reserved for the future recursive, multi-agent orchestrator. */
@@ -35,6 +36,8 @@ export interface ResearchSource {
 
 export const harnessCapabilities = Object.freeze({
   execution: true,
+  sequentialResearch: true,
+  clarification: true,
   streaming: true,
   steering: true,
   recursiveOrchestration: false,

@@ -1,3 +1,5 @@
+import { harnessOptionsSchema, harnessStateSchema } from './harness.js';
+export * from './harness.js';
 import { z } from 'zod';
 
 export const idSchema = z.uuid();
@@ -100,6 +102,7 @@ export const runStatusSchema = z.enum([
   'cancelled',
   'failed',
   'interrupted',
+  'waiting',
 ]);
 export const runSchema = z.object({
   id: idSchema,
@@ -118,12 +121,14 @@ export const runSchema = z.object({
   completedAt: timestamp.nullable(),
   error: z.string().nullable(),
   reportPath: z.string().nullable(),
+  harness: harnessStateSchema.nullable().default(null),
 });
 export type Run = z.infer<typeof runSchema>;
 export const startRunSchema = z
   .object({
     content: createMessageSchema.shape.content,
     mode: runModeSchema.default('chat'),
+    harness: harnessOptionsSchema.optional(),
     model: z.string().min(1).max(200).nullable().default(null),
     reasoningEffort: z.string().min(1).max(40).nullable().default(null),
   })
@@ -131,7 +136,7 @@ export const startRunSchema = z
 export type StartRunInput = z.infer<typeof startRunSchema>;
 
 export function isActiveRun(run: Pick<Run, 'status'>): boolean {
-  return run.status === 'queued' || run.status === 'running';
+  return run.status === 'queued' || run.status === 'running' || run.status === 'waiting';
 }
 
 export interface Workspace {

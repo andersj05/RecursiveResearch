@@ -76,6 +76,7 @@ export interface CodexTurnInput {
   model: string;
   effort: string;
   mode: 'chat' | 'research';
+  outputSchema?: Record<string, unknown>;
 }
 
 /** Only user-visible messages and public activity cross the provider boundary. */

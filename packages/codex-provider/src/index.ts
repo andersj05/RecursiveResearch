@@ -387,6 +387,7 @@ export class CodexProvider {
           model: input.model,
           effort: input.effort,
           summary: 'none',
+          ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
           approvalPolicy: 'never',
           sandboxPolicy: { type: 'readOnly', networkAccess: false },
         });
