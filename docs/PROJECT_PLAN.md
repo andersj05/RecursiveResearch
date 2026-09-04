@@ -2,46 +2,39 @@
 
 **Last reviewed:** 2026-09-04
 
-## 1. Application foundation
+## 1. Application foundation — complete
 
-Establish a coherent workspace that future agents can extend without inventing architecture or visual conventions.
+The TypeScript workspace separates the frontend, local backend, shared contracts, Codex provider, and harness policy.
+The Portfolio-derived interface provides project and chat navigation, configuration, and user-selected project folders.
+Project conversations restore after restart, the managed Codex connection exposes actual account/model/usage state, and development and production startup paths are documented.
 
-Exit criteria:
+## 2. Managed chat and research turns — implemented
 
-- The npm workspace separates frontend, local backend, shared contracts, provider adapter, and harness interfaces.
-- The Portfolio-derived interface provides project/chat navigation and configuration.
-- A project connects to a selected folder, saves briefs, and restores them after restart.
-- Harness configuration persists without launching an agent.
-- Codex connection, authentication, model discovery, and usage surfaces represent actual provider state or a clear unavailable state.
-- Development and production startup paths are documented and verified.
-- Formatting, lint, types, tests, and build pass.
-- Branch workflow, frequent commit conventions, repository memory, ADRs, CI, and contribution templates are in place.
+Each user submission starts one durable, cancellable Codex turn in Chat or Research mode.
+The user can choose an account-visible model and supported thinking level for each turn, watch assistant text stream into the conversation, send steering while the turn is active, and stop it.
+Later messages resume the saved Codex thread.
+A completed Research response is published as a project-owned Markdown report.
 
-## 2. Observable single research run
+The execution boundary is read-only and requires no approvals.
+External tools, connected apps, plugins, MCP servers, multi-agent delegation, and project-instruction loading are disabled through process-local provider configuration.
+Research mode may use Codex's built-in web search; Chat mode may not.
 
-Implement only after the foundation is accepted and a focused harness contract is agreed.
+This phase is locally release-validated by the complete repository check and a separate live-account Chat and Research smoke.
+Remote CI remains a publication-time check.
 
-Exit criteria:
+## 3. Recursive research orchestration
 
-- A saved brief starts one cancellable run with typed durable lifecycle events.
-- The UI renders incremental output and can resume a saved run view after restart.
-- Retrieved information records source provenance and distinguishes observation from inference.
-- Provider failure and cancellation preserve completed evidence and show a recoverable state.
-- A meaningful end-to-end test exercises the actual run path, with live-account verification reported separately.
-
-## 3. Parallel research and steering
-
-Add bounded parallel agents, visible assignments, and explicit steering inputs.
-Define ordering, budgets, cancellation propagation, state recovery, and evidence reconciliation before execution.
-Require behavior tests for concurrent completion, partial failure, cancellation, and restart.
+Add bounded child agents, visible assignments, and durable parent/child relationships.
+Define scheduling, budgets, cancellation propagation, restart recovery, source-level provenance, and evidence reconciliation before execution.
+Require behavior tests for concurrent completion, partial failure, cancellation, steering order, and restart.
 
 ## 4. Research synthesis and memory
 
-Add source review, evidence-backed synthesis, project research memory, and artifact export.
+Add structured source review, evidence-backed synthesis, project research memory, and richer artifact export.
 Persist provenance and trust metadata; model-generated conclusions remain reviewable.
 Repository contributor memory stays independent of product research memory.
 
 ## Deferred scope
 
-Experiments, remote multi-user hosting, distributed execution, and autonomous modification of this application's own code are outside the initial research workflow.
-Add new scope through an explicit plan or ADR rather than expanding the scaffold implicitly.
+Experiments, remote multi-user hosting, distributed execution, and autonomous modification of this application's own code are outside the current research workflow.
+Add new scope through an explicit plan or ADR rather than expanding the single-turn runtime implicitly.

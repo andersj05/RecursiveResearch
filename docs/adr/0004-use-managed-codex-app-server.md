@@ -31,3 +31,5 @@ Shared CLI logout is deliberately excluded.
 ## Evidence
 
 [Provider architecture](../architecture/CODEX_PROVIDER.md) and [official app-server documentation](https://learn.chatgpt.com/docs/app-server).
+
+[ADR-0006](0006-run-restricted-managed-codex-turns.md) extends this connection boundary to restricted managed turns.

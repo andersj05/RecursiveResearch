@@ -7,9 +7,9 @@ Then load only the relevant document below.
 | ------------------------------------------ | ---------------------------------------------------------------- |
 | Contributor conventions and branching      | [AGENTS.md](../AGENTS.md), [CONTRIBUTING.md](../CONTRIBUTING.md) |
 | Repository memory and handoffs             | [Memory protocol](memory/README.md)                              |
-| Package ownership and future harness seams | [Architecture](architecture/OVERVIEW.md)                         |
+| Package ownership and execution boundaries | [Architecture](architecture/OVERVIEW.md)                         |
 | User-selected folders and durable data     | [Persistence](architecture/PERSISTENCE.md)                       |
-| Codex authentication, models, and usage    | [Provider boundary](architecture/CODEX_PROVIDER.md)              |
+| Codex authentication, models, usage, turns | [Provider boundary](architecture/CODEX_PROVIDER.md)              |
 | Frontend tokens, components, accessibility | [Design system](design/DESIGN_SYSTEM.md)                         |
 | Scope, sequence, and exit criteria         | [Project plan](PROJECT_PLAN.md)                                  |
 | Why a significant decision was made        | [ADR index](adr/README.md)                                       |

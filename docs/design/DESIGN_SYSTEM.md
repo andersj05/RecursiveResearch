@@ -40,14 +40,25 @@ The persistent left sidebar contains the project list and nested chats, followed
 Keep project selection, chat selection, and primary actions visually distinct.
 Long names and paths must truncate or wrap deliberately without pushing controls out of view.
 
-The workspace presents saved briefs and space for future activity and files.
-Empty states explain the current action and should not resemble a completed research run.
-Buttons should name the action, and disabled execution should explain that the harness is not implemented.
+The `RR` mark is the compact product identity.
+The home view presents real projects and one clear create-project action.
+The conversation view keeps messages central, with Chat or Research mode, model, and thinking controls next to the composer.
+Show live progress only while a job is active; keep Stop and steering close to that job.
+Completed research reports belong with the resulting message and Files surface.
 
-Configuration uses labeled sections for the Codex connection and harness defaults.
+Configuration uses focused sections for the Codex connection, default model and thinking, and advanced harness limits.
 Account, loading, disconnected, unavailable, and error states must be explicit.
 Never present missing usage as zero or a missing provider as a connected account.
 Separate a form's unsaved draft from persisted configuration.
+
+## Interface copy
+
+Every visible phrase should identify an object, report a useful state, explain a decision, or name an action.
+Do not add slogans, ornamental eyebrow labels, repeated local-only assurances, version stamps, or descriptions that restate an obvious heading or control.
+Do not narrate planned features in the everyday workspace.
+Use one short empty-state sentence when it helps the user act; otherwise let the action stand on its own.
+Keep transient progress and errors next to the job or control they describe.
+Prefer `New project`, `New chat`, `Research`, and `Stop` over clever or technical labels.
 
 ## Component and accessibility conventions
 
@@ -59,4 +70,4 @@ Separate a form's unsaved draft from persisted configuration.
 - Keep all actions reachable on narrow screens and do not hide required navigation.
 - Inspect desktop, narrow layouts, keyboard interaction, loading/error states, and reduced motion when changing a shared component.
 
-Product copy should explain research work, not expose adapter protocols or internal package names.
+Product copy should explain research work, not expose adapter protocols, internal package names, implementation status, or decorative technical language.

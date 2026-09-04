@@ -34,3 +34,5 @@ Reserved directories are structure, not evidence of a working research harness.
 ## Evidence
 
 [Persistence contract](../architecture/PERSISTENCE.md) and the owner's project-folder requirement.
+
+[ADR-0006](0006-run-restricted-managed-codex-turns.md) adds durable single-turn jobs and server-published research reports within this boundary.

@@ -4,23 +4,27 @@
 
 ## Current objective
 
-The application foundation is implemented and validated locally on `feat/project-foundation`.
-The remaining delivery step is authorization to publish the source to the public GitHub remote and proceed with the documented integration workflow.
-See [progress](progress.md) for verified capabilities and limits.
+The simplified RR interface and managed single-turn Codex runtime are implemented and locally verified on `feat/project-foundation`.
+The feature branch is ready for review and later integration into `dev`.
+See [progress](progress.md) for verified capabilities and remaining limits.
 
 ## Branch state
 
 Local `main`, `dev`, and `feat/project-foundation` branches exist.
-The foundation is on the feature branch; `main` and `dev` remain at the initial baseline pending publication and integration.
+Current work remains on the feature branch; `main` and `dev` stay at the initial baseline pending publication and integration.
 No remote changes or branch protections have been installed.
 
 ## Immediate next actions
 
-- Obtain explicit authorization before publishing source to the public remote; automatic approval review rejected the attempted push because that authorization was absent.
-- After authorization, publish branches, open the feature-to-`dev` pull request, verify remote CI, and configure supported branch rules.
-- Begin harness implementation only in a separately scoped follow-up with its execution contract and acceptance criteria agreed.
+- Review and integrate `feat/project-foundation` into `dev` when the owner is ready.
+- Obtain explicit authorization before publishing source to the public GitHub remote; automatic approval review rejected the earlier push because that authorization was absent.
 
-## Blocking decisions
+## Next product phase
 
-The publication approval is the only delivery blocker; local development can continue.
-The research harness remains intentionally unimplemented.
+Design recursive parent/child jobs, source-level provenance, bounded scheduling, cancellation propagation, and restart checkpoints before implementing multi-agent orchestration.
+Experiments remain deferred.
+
+## Blockers
+
+Public-remote publication remains blocked on explicit authorization.
+Local development is otherwise unblocked.

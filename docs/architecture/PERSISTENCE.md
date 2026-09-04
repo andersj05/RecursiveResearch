@@ -25,26 +25,31 @@ The backend validates the path and creates its own metadata directory inside the
 ```text
 chosen-folder/
   .recursive-research/
-    workspace.json      Versioned project, chats, messages, and events snapshot
-    artifacts/          Reserved for generated research artifacts
+    workspace.json      Versioned project, chats, messages, jobs, and events snapshot
+    artifacts/          Completed Markdown research reports and managed files
     notes/              Reserved for user/research notes
-    runs/               Reserved for future durable run records
+    runs/               Reserved for future recursive-run payloads
     memory/             Reserved for future research context
 ```
 
-These reserved directories begin empty.
-They provide a stable ownership boundary; their presence does not mean the harness writes artifacts or memory yet.
-Project/chat data uses a versioned JSON snapshot with atomic replacement.
+Project, chat, message, single-turn job, provider-thread, and activity data use a versioned JSON snapshot with atomic replacement.
+The `notes`, `runs`, and `memory` directories remain reserved; their presence does not imply recursive orchestration or product research memory.
 An acknowledged mutation should survive restart; malformed or unsupported data must produce a recoverable error rather than be silently overwritten.
 
 The selected folder can contain unrelated files.
 Keep application-owned writes under `.recursive-research` and never treat connecting a folder as authorization to rewrite its other contents.
 Avoid destructive cleanup, recursive deletion, or relocation as a side effect of registering a project.
 
-Reconnecting a moved project's folder preserves its identity and conversations when the previous location is unavailable.
+Each Chat or Research submission creates a durable job and a streaming assistant-message placeholder before provider execution starts.
+The snapshot records mode, selected model and thinking level, provider thread and turn identifiers, timestamps, terminal errors, and the optional report path.
+A completed Research job writes its final assistant response once to `artifacts/research-<run-id>.md`; an existing file at that path is never overwritten.
+Chat jobs remain in the conversation and do not create a report.
+
+Reconnecting a moved project's folder preserves its identity, conversations, and jobs when the previous location is unavailable.
 Missing or unreadable projects remain listed as unavailable rather than disappearing from the registry.
-The file surface lists regular files already present under `artifacts`; it does not generate research files.
+The file surface lists regular files under `artifacts` and can preview a bounded UTF-8 file selected from that managed directory.
 Project identity is checked before listing artifacts so a replaced folder cannot expose a different project's files through a stale registration.
+Traversal, symbolic-link escape, non-regular files, and oversized previews are rejected.
 
 ## Writer coordination and recovery
 
@@ -63,10 +68,16 @@ Malformed JSON or an unsupported schema returns `409 INVALID_STORAGE` without ov
 Symbolic links in managed metadata and lock paths are rejected.
 Tests exercise independent Node processes on a local filesystem; network and cloud-synchronized filesystem behavior is not guaranteed.
 
+An active job stores a private process and host owner in the project snapshot; those fields never cross the public contract.
+Only the owning server process may mutate that job.
+If the owner process is known to be gone, the next project read marks the job and streaming message interrupted while retaining partial output.
+If a project folder disappears as a turn completes, the live coordinator retains the authorized terminal update in memory and retries it when the folder becomes available.
+This recovery does not make an in-flight provider turn resumable after server restart.
+
 ## Future evolution
 
-- Artifact and research-memory schemas need provenance, timestamps, authorship/source identity, and an explicit trust level.
-- Run persistence needs crash recovery and replay semantics before parallel execution is released.
+- Structured evidence and research-memory schemas need provenance, timestamps, authorship/source identity, and an explicit trust level.
+- Recursive run persistence needs child-job checkpoints, cancellation propagation, and replay semantics before parallel orchestration is released.
 - Schema migrations must preserve existing data and reject newer unsupported versions clearly.
 - Backup/export, project removal, and broader recovery need user-visible policies before implementing those features.
 

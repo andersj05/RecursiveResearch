@@ -1,10 +1,10 @@
 # RecursiveResearch
 
-A local workspace for research with parallel agents.
-Organize projects and their chats, keep research in folders you choose, and shape the harness that will gather evidence and develop ideas.
+A local workspace for focused research with Codex.
+Organize projects and chats, keep research in folders you choose, and run chat or web research jobs from one restrained interface.
 
-This repository starts with the application foundation.
-The research harness is intentionally not implemented yet.
+Each job runs one managed Codex turn.
+Recursive multi-agent orchestration and experiments remain future work.
 
 ## Start developing
 
@@ -32,11 +32,11 @@ The root [package.json](package.json) is the authority for commands.
 ```text
 apps/
   web/                  React interface and Portfolio-derived design tokens
-  server/               Local API, project storage, provider lifecycle
+  server/               Local API, project storage, run coordination, provider lifecycle
 packages/
   contracts/            Shared schemas and API types
-  codex-provider/       Codex app-server connection boundary
-  harness/              Contracts for the future research harness
+  codex-provider/       Restricted Codex app-server connection and execution
+  harness/              Turn guidance and future recursive harness contracts
 docs/
   architecture/         Component boundaries and persistence ownership
   design/               Frontend conventions
@@ -46,17 +46,17 @@ docs/
 
 ## Your workspace
 
-The left sidebar groups chats under projects.
+The left sidebar groups chats under projects and keeps the selected conversation in view.
 Connect a project to an existing local folder using the Windows folder chooser or an absolute path.
 On other platforms, enter the absolute path directly.
-Its saved conversations and future research files stay in that folder's `.recursive-research` directory.
+Its conversations, job records, and research reports stay in that folder's `.recursive-research` directory.
 The local app registry and harness defaults live separately in the operating system's application-data directory.
 See [persistence](docs/architecture/PERSISTENCE.md) for the layout and environment override.
 
-Configuration provides a Codex connection surface and persisted harness defaults.
-Codex connectivity uses the official Codex app-server boundary and keeps authentication in the local provider process.
-See [provider architecture](docs/architecture/CODEX_PROVIDER.md) for setup and implementation limits.
-No autonomous research or experiments are launched by this foundation.
+Configuration reuses the Codex subscription already connected through the official Codex CLI and shows account, model, and usage state.
+Choose Chat or Research for each prompt and select the model and thinking level for that turn.
+Responses stream into the conversation; an active turn can be stopped or steered, and a completed Research job is also saved as a Markdown report under the project's managed artifacts folder.
+See [provider architecture](docs/architecture/CODEX_PROVIDER.md) for the execution boundary and restrictions.
 
 ## Contribute
 
