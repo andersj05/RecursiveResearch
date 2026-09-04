@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.local/
+.recursive-research/
+artifacts/
+playwright-report/
+test-results/
+*.log
+.DS_Store
+Thumbs.db
