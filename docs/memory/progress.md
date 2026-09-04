@@ -20,8 +20,12 @@ The released single-turn foundation remains on `main` and `dev`. `feat/research-
 - The final expanded root check passed formatting, lint, strict TypeScript, all 73 tests, and the production build. This includes clarification after restart, durable steering, infrastructure cancellation, maximum-sized context, and abandoned-task recovery.
 - Live GPT-5.4-Mini / low research completed with two simultaneous researcher turns, eight retained sources, 21 real search/open/find actions, synthesis, and a saved report. The configured source cap stopped the run after one cycle.
 - Fixture tests verify two-cycle evolution, source merging, child lineage, budgets, partial failure, stop propagation, structured-output rejection, and global pool cancellation.
-- Browser fixture verification covered launch, a second research cycle, tool filtering and expanded arguments, interactive topology, and desktop/390px layouts without horizontal overflow. The saved live-run trace and actual launch descriptor were also inspected in the browser.
+- Browser fixture verification covered launch, a second research cycle, tool filtering and expanded arguments, interactive topology, chat Research opening Orchestration, clarification/continuation/Stop, and desktop/390px layouts without horizontal overflow. The saved live-run trace and actual launch descriptor were also inspected in the browser.
 - Prior foundation checks cover account metadata, restricted native execution policy, live Chat/Research, thread continuity, storage ownership, cross-process writers, and artifact publication. Prior v1 harness checks cover legacy clarification and five-stage live execution.
+
+## Delivery
+
+[PR #1](https://github.com/andersj05/RecursiveResearch/pull/1) targets `dev`; implementation revision `d5d0fa0` passed Windows and Ubuntu CI and branch-flow validation. No merge or release promotion has been performed.
 
 ## Limits
 

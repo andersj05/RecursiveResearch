@@ -8,7 +8,7 @@ Adaptive delegated research and an expert dashboard are implemented on `feat/res
 
 ## Immediate next actions
 
-- Final local validation passed 73 tests and the production build. Publish the revised feature PR and verify remote CI.
+- Final local validation passed 73 tests and the production build. [PR #1](https://github.com/andersj05/RecursiveResearch/pull/1) is published; Windows and Ubuntu CI passed the implementation revision.
 - Review the research UX and bounded runtime before integration into `dev`. Release promotion into `main` remains separate.
 
 ## Blockers
