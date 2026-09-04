@@ -4,6 +4,14 @@ The checked-in branch policy is `main -> dev -> feat/<feature>`.
 The [CI workflow](../.github/workflows/ci.yml) validates pull-request routes and runs the root check suite on Linux and Windows with Node.js 24.
 This document specifies the intended remote setup; it does not claim GitHub protections are already installed.
 
+## Current state
+
+As of 2026-09-04, local `main`, `dev`, and `feat/project-foundation` exist.
+The implementation remains on the feature branch; `main` and `dev` are at the initial baseline.
+Automatic approval review rejected publishing to the public GitHub remote because explicit source-publication authorization was absent.
+No remote changes were made and protections are not installed.
+Obtain that authorization before pushing, then follow the feature-to-`dev` review workflow and verify remote checks before integration.
+
 ## Intended GitHub configuration
 
 Keep `main` and `dev` as permanent branches.

@@ -15,6 +15,7 @@ Reserve sibling `artifacts`, `notes`, `runs`, and `memory` directories for futur
 Keep the project registry and global harness defaults in the local application-data directory.
 Allow an application-data environment override for isolated development and tests.
 Leave unrelated files in selected folders alone.
+Coordinate cooperating writers with application-registry and project-directory locks, acquired in that order, and reload snapshots under the relevant lock.
 
 ## Alternatives
 
@@ -26,7 +27,8 @@ A separate database per project is an option when concurrent execution and query
 
 Project data is easy to locate and back up with its folder.
 The initial snapshot design favors simplicity for saved chats and configuration.
-Concurrent writers, run replay, data migrations, and folder relocation require explicit future design and tests.
+Independent local writer processes are covered by coordination tests.
+Run replay, schema migrations, and broader recovery still require explicit future design and tests.
 Reserved directories are structure, not evidence of a working research harness.
 
 ## Evidence
