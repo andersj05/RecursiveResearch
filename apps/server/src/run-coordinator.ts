@@ -23,6 +23,7 @@ interface Worker {
   timedOut: boolean;
   stopping: boolean;
   shutdown: boolean;
+  finishing: boolean;
   lastProgress: string;
 }
 
@@ -54,6 +55,10 @@ export class RunCoordinator {
         'SAVE_PENDING',
         'The previous response is waiting for its project folder. Reconnect the folder and retry.',
       );
+    if (this.closing)
+      throw new AppError(503, 'SERVER_STOPPING', 'The app is restarting. Try again shortly.');
+    const finishing = [...this.active.values()].filter((worker) => worker.finishing);
+    if (finishing.length) await Promise.all(finishing.map((worker) => worker.done));
     if (this.closing)
       throw new AppError(503, 'SERVER_STOPPING', 'The app is restarting. Try again shortly.');
     const { settings } = await this.store.workspace();
@@ -118,6 +123,7 @@ export class RunCoordinator {
         timedOut: false,
         stopping: false,
         shutdown: false,
+        finishing: false,
         lastProgress: '',
       };
       this.active.set(run.id, worker);
@@ -221,6 +227,7 @@ export class RunCoordinator {
         (event) => this.event(worker, event),
         worker.controller.signal,
       );
+      worker.finishing = true;
       if (worker.flushTimer) clearTimeout(worker.flushTimer);
       await worker.queue;
       if (worker.failure) throw worker.failure;
@@ -243,6 +250,7 @@ export class RunCoordinator {
         turnId: result.turnId,
       });
     } catch (error) {
+      worker.finishing = true;
       if (worker.flushTimer) clearTimeout(worker.flushTimer);
       await worker.queue;
       const failure = worker.failure ?? error;
