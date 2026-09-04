@@ -68,7 +68,7 @@ export function ProjectDialog({
       }}
     >
       <div className="window-bar">
-        <span>workspace / new-project</span>
+        <span id="project-dialog-title">New project</span>
         <button
           type="button"
           className="icon-button inverse"
@@ -81,12 +81,6 @@ export function ProjectDialog({
       </div>
       <form onSubmit={(event) => void submit(event)}>
         <div className="dialog-copy">
-          <p className="eyebrow">+-- a place to think</p>
-          <h2 id="project-dialog-title">Connect a project.</h2>
-          <p>
-            Choose a folder for your research. Chats and project files will stay together on your
-            computer.
-          </p>
           <label className="field">
             <span>Project name</span>
             <input
@@ -95,7 +89,7 @@ export function ProjectDialog({
               onChange={(event) => setName(event.target.value)}
               required
               maxLength={100}
-              placeholder="e.g. Emergent capabilities"
+              placeholder="Project name"
               disabled={busy}
             />
           </label>
@@ -120,14 +114,7 @@ export function ProjectDialog({
                 {picking ? 'Choosing…' : 'Browse'}
               </button>
             </div>
-            <small>Choose an existing local folder, or paste its full path.</small>
-          </div>
-          <div className="note">
-            <Icon name="file" />
-            <p>
-              RecursiveResearch keeps its own files inside this folder. Your existing files stay in
-              place.
-            </p>
+            <small>Choose an existing folder.</small>
           </div>
           {error && (
             <p className="inline-error" role="alert">
@@ -149,7 +136,7 @@ export function ProjectDialog({
             type="submit"
             disabled={busy || picking || !name.trim() || !folderPath.trim()}
           >
-            {busy ? 'Connecting…' : 'Connect project'}
+            {busy ? 'Creating…' : 'Create project'}
             <Icon name="arrow" />
           </button>
         </div>

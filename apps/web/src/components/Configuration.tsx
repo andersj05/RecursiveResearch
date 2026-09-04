@@ -8,6 +8,7 @@ import type {
 } from '@recursive-research/codex-provider';
 import { api, describeError, request } from '../lib/api';
 import { Icon } from './Icon';
+import { ModelControls } from './ModelControls';
 
 function UsageWindow({ window, label }: { window: CodexQuotaWindow; label: string }) {
   const remaining =
@@ -176,18 +177,12 @@ export function Configuration({
   return (
     <div className="configuration page-content">
       <div className="page-intro compact">
-        <p className="eyebrow">
-          <span>$</span> research --configure
-        </p>
-        <h1>Make room for your process.</h1>
-        <p className="lede">Connect your models and shape the research harness.</p>
+        <h1>Configuration</h1>
       </div>
       <section className="settings-section" aria-labelledby="codex-heading">
         <div className="settings-heading">
           <div>
-            <p className="eyebrow">01 / CONNECTION</p>
-            <h2 id="codex-heading">Codex account</h2>
-            <p>Use your local Codex sign-in and subscription.</p>
+            <h2 id="codex-heading">Codex subscription</h2>
           </div>
           <button
             type="button"
@@ -201,7 +196,9 @@ export function Configuration({
         </div>
         <div className="account-card">
           <div className="account-mark">
-            <Icon name="terminal" size={25} />
+            <span className="brand-mark" aria-hidden="true">
+              RR
+            </span>
           </div>
           <div className="account-copy">
             <strong>
@@ -211,11 +208,9 @@ export function Configuration({
             </strong>
             <span>
               {status?.state === 'connected'
-                ? `${status.account?.planType ?? status.account?.type ?? 'Account'} · credentials managed by Codex`
+                ? (status.account?.planType ?? status.account?.type ?? 'Codex')
                 : (status?.message ??
-                  (status
-                    ? 'Connect to see available models and usage.'
-                    : 'Checking your local Codex connection…'))}
+                  (status ? 'Sign in with your ChatGPT account.' : 'Checking connection…'))}
             </span>
           </div>
           <span className={`status-label ${status?.state === 'connected' ? 'connected' : ''}`}>
@@ -238,15 +233,11 @@ export function Configuration({
               {connecting ? 'Preparing sign-in…' : 'Connect Codex'}
               <Icon name="external" size={14} />
             </button>
-            <p>Sign in through Codex. No API key is needed here.</p>
           </div>
         )}
         {pending && (
           <div className="login-prompt">
-            <p>
-              Complete the Codex sign-in in your browser. This page will update when you’re
-              connected.
-            </p>
+            <p>Finish signing in with ChatGPT in your browser.</p>
             <div className="button-row">
               {authUrl && (
                 <a
@@ -283,8 +274,7 @@ export function Configuration({
         {status?.state === 'connected' && (
           <div className="usage-area">
             <div className="section-title-row">
-              <h3>Subscription usage</h3>
-              <span>Shared across your Codex account</span>
+              <h3>Usage</h3>
             </div>
             {buckets.length ? (
               buckets.map((bucket, index) => (
@@ -319,94 +309,62 @@ export function Configuration({
         <section className="settings-section" aria-labelledby="harness-heading">
           <div className="settings-heading">
             <div>
-              <p className="eyebrow">02 / HARNESS DEFAULTS</p>
-              <h2 id="harness-heading">How research should unfold</h2>
-              <p>Saved defaults for the harness you’ll build next.</p>
+              <h2 id="harness-heading">Chat & research defaults</h2>
             </div>
-            <span className="tag">Configuration only</span>
           </div>
-          <label className="field">
-            <span>Research model</span>
-            <select
-              value={draft.model ?? ''}
-              onChange={(event) => change('model', event.target.value || null)}
-            >
-              <option value="">Use the Codex default</option>
-              {draft.model && !models.some((model) => model.model === draft.model) && (
-                <option value={draft.model}>{draft.model} (saved)</option>
-              )}
-              {models.map((model) => (
-                <option key={model.id} value={model.model}>
-                  {model.displayName}
-                  {model.isDefault ? ' · default' : ''}
-                </option>
-              ))}
-            </select>
-            <small>
-              {models.length
-                ? 'Available models are read from your Codex account.'
-                : 'Connect Codex to load the models available to your account.'}
-            </small>
-          </label>
-          <div className="numeric-fields">
+          <ModelControls
+            models={models}
+            model={draft.model}
+            reasoningEffort={draft.reasoningEffort}
+            onModelChange={(model) => change('model', model)}
+            onReasoningChange={(effort) => change('reasoningEffort', effort)}
+          />
+          <details className="harness-options">
+            <summary>Advanced</summary>
+            <div className="numeric-fields">
+              <label className="field">
+                <span>Concurrent jobs</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={16}
+                  required
+                  value={draft.maxParallelAgents}
+                  onChange={(event) => change('maxParallelAgents', Number(event.target.value))}
+                />
+              </label>
+              <label className="field">
+                <span>Sources per research job</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  required
+                  value={draft.maxSourcesPerAgent}
+                  onChange={(event) => change('maxSourcesPerAgent', Number(event.target.value))}
+                />
+              </label>
+            </div>
             <label className="field">
-              <span>Parallel agents</span>
-              <input
-                type="number"
-                min={1}
-                max={16}
-                required
-                value={draft.maxParallelAgents}
-                onChange={(event) => change('maxParallelAgents', Number(event.target.value))}
+              <span>Research instructions</span>
+              <textarea
+                rows={4}
+                value={draft.instructions}
+                maxLength={20000}
+                onChange={(event) => change('instructions', event.target.value)}
               />
-              <small>Maximum concurrent researchers.</small>
             </label>
-            <label className="field">
-              <span>Research depth</span>
+            <label className="checkbox-field">
               <input
-                type="number"
-                min={1}
-                max={10}
-                required
-                value={draft.maxDepth}
-                onChange={(event) => change('maxDepth', Number(event.target.value))}
+                type="checkbox"
+                checked={draft.requirePrimarySources}
+                onChange={(event) => change('requirePrimarySources', event.target.checked)}
               />
-              <small>Maximum rounds of follow-up.</small>
+              <span>
+                <strong>Require primary sources</strong>
+              </span>
             </label>
-            <label className="field">
-              <span>Sources per agent</span>
-              <input
-                type="number"
-                min={1}
-                max={100}
-                required
-                value={draft.maxSourcesPerAgent}
-                onChange={(event) => change('maxSourcesPerAgent', Number(event.target.value))}
-              />
-              <small>Source collection limit per agent.</small>
-            </label>
-          </div>
-          <label className="field">
-            <span>Research instructions</span>
-            <textarea
-              rows={4}
-              value={draft.instructions}
-              maxLength={20000}
-              onChange={(event) => change('instructions', event.target.value)}
-            />
-            <small>Describe the evidence, reasoning, and output you expect.</small>
-          </label>
-          <label className="checkbox-field">
-            <input
-              type="checkbox"
-              checked={draft.requirePrimarySources}
-              onChange={(event) => change('requirePrimarySources', event.target.checked)}
-            />
-            <span>
-              <strong>Require primary sources</strong>
-              <small>Prefer original papers, official documentation, and firsthand evidence.</small>
-            </span>
-          </label>
+          </details>
         </section>
         <div className="settings-save">
           <span role="status">
@@ -418,7 +376,7 @@ export function Configuration({
             ) : dirty ? (
               'Unsaved changes'
             ) : (
-              'Your defaults are stored locally.'
+              ''
             )}
           </span>
           <button type="submit" className="button primary" disabled={busy || !dirty}>
@@ -432,13 +390,6 @@ export function Configuration({
           </p>
         )}
       </form>
-      <div className="note configuration-note">
-        <Icon name="tree" />
-        <p>
-          The workspace is ready for a research harness. These settings are stored now; running
-          agents, gathering sources, and live steering will be implemented next.
-        </p>
-      </div>
     </div>
   );
 }

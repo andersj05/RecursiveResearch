@@ -18,6 +18,8 @@ const paths = {
   activity: 'M3 12h4l3-8 4 16 3-8h4',
   menu: 'M4 6h16M4 12h16M4 18h16',
   home: 'm3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8',
+  stop: 'M5 5h14v14H5Z',
+  search: 'M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z',
 } as const;
 
 export type IconName = keyof typeof paths;

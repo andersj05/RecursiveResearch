@@ -1,105 +1,64 @@
+import type { Project } from '@recursive-research/contracts';
 import { Icon } from './Icon';
 
 export function Welcome({
-  projectCount,
+  projects,
   onCreate,
   onConfigure,
+  onSelect,
 }: {
-  projectCount: number;
+  projects: Project[];
   onCreate: () => void;
   onConfigure: () => void;
+  onSelect: (project: Project) => void;
 }) {
   return (
     <div className="welcome page-content">
-      <div className="page-intro">
-        <p className="eyebrow">
-          <span>$</span> research --open-ended
-        </p>
-        <h1>
-          Good research starts
-          <br />
-          with a better question.
-        </h1>
-        <p className="lede">
-          A workspace for following ideas, gathering evidence,
-          <br className="desktop-break" /> and seeing where the next question leads.
-        </p>
+      <div className="welcome-heading">
+        <span className="welcome-monogram" aria-hidden="true">
+          RR
+        </span>
+        <h1>RecursiveResearch</h1>
       </div>
-      <section className="welcome-window" aria-labelledby="start-title">
-        <div className="window-bar">
-          <span>workspace / getting-started</span>
-          <span>LOCAL FIRST</span>
-        </div>
-        <div className="welcome-window-body">
-          <div>
-            <p className="eyebrow">01 / SET THE GROUNDWORK</p>
-            <h2 id="start-title">Give your next question a home.</h2>
-            <p>
-              Connect a project to a folder on your computer. Keep every conversation, source, and
-              idea in one place as your research grows.
-            </p>
-            <button type="button" className="button primary" onClick={onCreate}>
-              <Icon name="plus" />
-              New project
-              <Icon name="arrow" />
-            </button>
-          </div>
-          <div
-            className="research-tree"
-            aria-label="A research question branches into evidence, connections, and new questions"
-          >
-            <div className="tree-node root-node">
-              <span className="tree-marker">?</span>an open question
-            </div>
-            <div className="tree-branches">
-              <div className="tree-node">
-                <span className="tree-marker">↳</span>gather evidence
-              </div>
-              <div className="tree-node">
-                <span className="tree-marker">↳</span>connect ideas
-              </div>
-              <div className="tree-node last-node">
-                <span className="tree-marker">↳</span>ask what comes next
-                <span className="blinking-cursor" aria-hidden="true">
-                  _
-                </span>
-              </div>
-            </div>
-            <span className="tree-caption">curiosity, with a working directory.</span>
-          </div>
-        </div>
-      </section>
-      <div className="welcome-bottom">
-        <section className="plain-section">
-          <p className="eyebrow">+-- your workspace</p>
-          <h2>Local files. Room to explore.</h2>
-          <p>
-            Projects organize your chats. Each chat holds a research brief you can revisit and
-            refine.
-          </p>
-          <div className="workspace-fact">
-            <span>Connected projects</span>
-            <strong>{String(projectCount).padStart(2, '0')}</strong>
-          </div>
-        </section>
-        <section className="plain-section">
-          <p className="eyebrow">+-- prepare the harness</p>
-          <h2>Set up the way you research.</h2>
-          <p>
-            Connect your Codex account and save your agent defaults. Parallel research and steering
-            are the next layer.
-          </p>
-          <button type="button" className="text-button" onClick={onConfigure}>
-            Open configuration
-            <Icon name="arrow" size={14} />
+      <section className="welcome-projects" aria-labelledby="projects-heading">
+        <div className="section-title-row">
+          <h2 id="projects-heading">Projects</h2>
+          <button type="button" className="button primary small" onClick={onCreate}>
+            <Icon name="plus" size={14} />
+            New project
           </button>
-        </section>
-      </div>
-      <div className="page-footnote">
-        <span className="status-dot" />
-        Workspace foundation<span className="footnote-separator">/</span>Agent execution is not
-        connected yet.
-      </div>
+        </div>
+        {projects.length ? (
+          <ul className="home-project-list">
+            {[...projects]
+              .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+              .map((project) => (
+                <li key={project.id}>
+                  <button type="button" onClick={() => onSelect(project)}>
+                    <Icon name="folder" size={21} />
+                    <span className="home-project-copy">
+                      <strong>{project.name}</strong>
+                      <span title={project.folderPath}>{project.folderPath}</span>
+                    </span>
+                    {!project.available && <span className="tag">Folder unavailable</span>}
+                    <Icon name="arrow" size={16} />
+                  </button>
+                </li>
+              ))}
+          </ul>
+        ) : (
+          <button className="welcome-create" type="button" onClick={onCreate}>
+            <Icon name="folder" size={26} />
+            <strong>Create a project</strong>
+            <span>Choose a folder to get started.</span>
+          </button>
+        )}
+      </section>
+      <button type="button" className="text-button welcome-settings" onClick={onConfigure}>
+        <Icon name="settings" size={14} />
+        Codex & configuration
+        <Icon name="arrow" size={13} />
+      </button>
     </div>
   );
 }

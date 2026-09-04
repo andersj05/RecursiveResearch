@@ -5,6 +5,8 @@ import type {
   HarnessConfig,
   Message,
   Project,
+  Run,
+  StartRunInput,
   Workspace,
 } from '@recursive-research/contracts';
 
@@ -65,6 +67,21 @@ export const api = {
     }),
   saveMessage: (chatId: string, content: string) =>
     request<Message>(`/chats/${encodeURIComponent(chatId)}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    }),
+  startRun: (chatId: string, input: StartRunInput) =>
+    request<Run>(`/chats/${encodeURIComponent(chatId)}/runs`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  stopRun: (runId: string) =>
+    request<Run>(`/runs/${encodeURIComponent(runId)}/cancel`, {
+      method: 'POST',
+      body: '{}',
+    }),
+  steerRun: (runId: string, content: string) =>
+    request<Run>(`/runs/${encodeURIComponent(runId)}/steer`, {
       method: 'POST',
       body: JSON.stringify({ content }),
     }),

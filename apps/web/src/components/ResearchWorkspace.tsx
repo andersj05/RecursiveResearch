@@ -1,18 +1,24 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import type { Artifact, Chat, ChatDetail, Project } from '@recursive-research/contracts';
+import {
+  isActiveRun,
+  type Chat,
+  type HarnessConfig,
+  type Project,
+  type RunMode,
+} from '@recursive-research/contracts';
 import { api, describeError } from '../lib/api';
+import { useCodexModels } from '../hooks/useCodexModels';
+import { useConversation } from '../hooks/useConversation';
+import { ConversationMessages, formatTime } from './ConversationMessages';
 import { Icon } from './Icon';
+import { ModelControls } from './ModelControls';
 
-type WorkspaceTab = 'brief' | 'activity' | 'files';
-
-function formatTime(value: string) {
-  return new Date(value).toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
+type WorkspaceTab = 'conversation' | 'activity' | 'files';
+const tabs = [
+  { id: 'conversation', label: 'Conversation', icon: 'chat' },
+  { id: 'activity', label: 'Activity', icon: 'activity' },
+  { id: 'files', label: 'Files', icon: 'file' },
+] as const;
 
 function formatSize(bytes: number) {
   return bytes < 1024
@@ -26,6 +32,7 @@ export function ResearchWorkspace({
   project,
   chat,
   revision,
+  settings,
   onChatCreated,
   onSaved,
   onConfigure,
@@ -33,70 +40,96 @@ export function ResearchWorkspace({
   project: Project;
   chat: Chat | null;
   revision: number;
+  settings: HarnessConfig;
   onChatCreated: (chat: Chat) => void;
   onSaved: () => void;
   onConfigure: () => void;
 }) {
-  const [tab, setTab] = useState<WorkspaceTab>('brief');
-  const [detail, setDetail] = useState<ChatDetail | null>(null);
-  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [tab, setTab] = useState<WorkspaceTab>('conversation');
   const [draft, setDraft] = useState('');
+  const [mode, setMode] = useState<RunMode>('chat');
+  const [model, setModel] = useState(settings.model);
+  const [reasoningEffort, setReasoningEffort] = useState(settings.reasoningEffort);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [notice, setNotice] = useState('');
+  const [stopping, setStopping] = useState(false);
+  const {
+    detail,
+    artifacts,
+    error: loadError,
+    loading,
+    reconnecting,
+    refresh,
+  } = useConversation(project.id, chat?.id, revision);
+  const provider = useCodexModels();
+  const activeRun = detail?.runs.find(isActiveRun);
+  const selectedMode = activeRun?.mode ?? mode;
+  const latestProgress = activeRun
+    ? [...(detail?.events ?? [])].reverse().find((event) => event.runId === activeRun.id)?.summary
+    : null;
   const messageEnd = useRef<HTMLDivElement>(null);
-  const chatId = chat?.id;
+  const createdChat = useRef<Chat | null>(chat);
+  const stickToBottom = useRef(true);
+  const connected = provider.status?.state === 'connected';
+  const chosenModel =
+    provider.models.find((item) => item.model === model) ??
+    (model === null
+      ? (provider.models.find((item) => item.isDefault) ?? provider.models[0])
+      : undefined);
+  const modelUnavailable = model !== null && provider.models.length > 0 && !chosenModel;
 
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    const load = async () => {
-      const results = await Promise.allSettled([
-        chatId ? api.chat(chatId) : Promise.resolve(null),
-        api.artifacts(project.id),
-      ]);
-      if (cancelled) return;
-      if (results[0].status === 'fulfilled') setDetail(results[0].value);
-      if (results[1].status === 'fulfilled') setArtifacts(results[1].value);
-      const failures = results
-        .filter((result) => result.status === 'rejected')
-        .map((result) => describeError(result.reason));
-      if (failures.length) setError(failures.join(' '));
-      setLoading(false);
+    const update = () => {
+      stickToBottom.current =
+        document.documentElement.scrollHeight - window.scrollY - window.innerHeight < 180;
     };
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [chatId, project.id, revision]);
+    window.addEventListener('scroll', update, { passive: true });
+    return () => window.removeEventListener('scroll', update);
+  }, []);
 
   useEffect(() => {
-    messageEnd.current?.scrollIntoView({ block: 'nearest' });
-  }, [detail?.messages.length]);
+    if (stickToBottom.current) messageEnd.current?.scrollIntoView({ block: 'nearest' });
+  }, [detail?.messages]);
 
-  async function saveBrief(event: FormEvent) {
+  async function send(event: FormEvent) {
     event.preventDefault();
-    if (!draft.trim() || busy) return;
+    if (
+      !draft.trim() ||
+      busy ||
+      !connected ||
+      !project.available ||
+      modelUnavailable ||
+      activeRun?.status === 'queued'
+    )
+      return;
     setBusy(true);
     setError(null);
     try {
-      let activeChat = chat;
-      if (!activeChat)
-        activeChat = await api.createChat(
-          project.id,
-          draft.trim().replace(/\s+/g, ' ').slice(0, 80),
-        );
-      const message = await api.saveMessage(activeChat.id, draft.trim());
-      setDetail((current) => ({
-        chat: activeChat,
-        messages: [...(current?.messages ?? []), message],
-        events: current?.events ?? [],
-      }));
+      if (activeRun) {
+        await api.steerRun(activeRun.id, draft.trim());
+      } else {
+        const target =
+          createdChat.current ??
+          (await api.createChat(project.id, draft.trim().replace(/\s+/g, ' ').slice(0, 80)));
+        createdChat.current = target;
+        const supportedEffort =
+          reasoningEffort &&
+          chosenModel?.supportedReasoningEfforts.some(
+            (item) => item.reasoningEffort === reasoningEffort,
+          )
+            ? reasoningEffort
+            : null;
+        await api.startRun(target.id, {
+          content: draft.trim(),
+          mode,
+          model,
+          reasoningEffort: supportedEffort,
+        });
+        onChatCreated(target);
+      }
       setDraft('');
-      setNotice('Research brief saved to your project folder.');
-      onChatCreated(activeChat);
+      stickToBottom.current = true;
+      refresh();
       onSaved();
     } catch (cause) {
       setError(describeError(cause));
@@ -105,35 +138,38 @@ export function ResearchWorkspace({
     }
   }
 
+  async function stop() {
+    if (!activeRun || stopping) return;
+    setStopping(true);
+    setError(null);
+    try {
+      await api.stopRun(activeRun.id);
+      refresh();
+    } catch (cause) {
+      setError(describeError(cause));
+    } finally {
+      setStopping(false);
+    }
+  }
+
   return (
     <div className="research-page">
       <div className="research-heading">
         <div>
-          <p className="eyebrow">
-            +-- projects / {project.name.toLowerCase().replace(/\s+/g, '-')}
-          </p>
-          <h1>{chat?.title ?? 'A new line of inquiry.'}</h1>
+          <h1>{detail?.chat.title ?? chat?.title ?? 'New chat'}</h1>
           <p className="folder-location" title={project.folderPath}>
-            <Icon name="folder" size={14} />
+            <Icon name="folder" size={13} />
             {project.folderPath}
           </p>
         </div>
-        <span className="tag">{project.available ? 'Local project' : 'Folder unavailable'}</span>
       </div>
       {!project.available && (
         <div className="inline-error" role="alert">
-          This project folder is unavailable. Reconnect its drive or restore the folder to continue
-          saving.
+          Project folder unavailable. Reconnect its drive or restore the folder to continue.
         </div>
       )}
       <div className="workspace-tabs" role="tablist" aria-label="Research views">
-        {(
-          [
-            { id: 'brief', label: 'Conversation', icon: 'chat' },
-            { id: 'activity', label: 'Activity', icon: 'activity' },
-            { id: 'files', label: 'Files', icon: 'file' },
-          ] as const
-        ).map((item) => (
+        {tabs.map((item, index) => (
           <button
             key={item.id}
             id={`tab-${item.id}`}
@@ -144,13 +180,11 @@ export function ResearchWorkspace({
             type="button"
             onClick={() => setTab(item.id)}
             onKeyDown={(event) => {
-              const tabs: WorkspaceTab[] = ['brief', 'activity', 'files'];
-              const current = tabs.indexOf(tab);
               const next =
                 event.key === 'ArrowRight'
-                  ? (current + 1) % tabs.length
+                  ? (index + 1) % tabs.length
                   : event.key === 'ArrowLeft'
-                    ? (current + tabs.length - 1) % tabs.length
+                    ? (index + tabs.length - 1) % tabs.length
                     : event.key === 'Home'
                       ? 0
                       : event.key === 'End'
@@ -160,8 +194,8 @@ export function ResearchWorkspace({
               event.preventDefault();
               const target = tabs[next];
               if (target) {
-                setTab(target);
-                document.getElementById(`tab-${target}`)?.focus();
+                setTab(target.id);
+                document.getElementById(`tab-${target.id}`)?.focus();
               }
             }}
           >
@@ -172,15 +206,33 @@ export function ResearchWorkspace({
             )}
           </button>
         ))}
-        <span className="tabs-status">
-          <span className="status-dot" />
-          No agents running
-        </span>
       </div>
-      {error && (
+      {(error || loadError) && (
         <p className="inline-error research-error" role="alert">
-          {error}
+          {error ?? loadError}
         </p>
+      )}
+      {reconnecting && (
+        <p className="connection-notice" role="status">
+          Reconnecting…
+        </p>
+      )}
+      {activeRun && (
+        <div className="run-progress">
+          <span className="status-dot online" />
+          <span role="status">
+            {latestProgress ?? (activeRun.status === 'queued' ? 'Starting…' : 'Working…')}
+          </span>
+          <button
+            className="button small"
+            type="button"
+            onClick={() => void stop()}
+            disabled={stopping}
+          >
+            <Icon name="stop" size={12} />
+            {stopping ? 'Stopping…' : 'Stop'}
+          </button>
+        </div>
       )}
       <div className="research-layout">
         <section
@@ -189,7 +241,7 @@ export function ResearchWorkspace({
           role="tabpanel"
           aria-labelledby={`tab-${tab}`}
         >
-          {tab === 'brief' && (
+          {tab === 'conversation' && (
             <>
               <div className="conversation-content">
                 {loading && !detail ? (
@@ -197,91 +249,125 @@ export function ResearchWorkspace({
                     Loading conversation…
                   </p>
                 ) : detail?.messages.length ? (
-                  <div className="message-list">
-                    {detail.messages.map((message) => (
-                      <article key={message.id} className="message">
-                        <div className="message-meta">
-                          <span className="message-avatar">
-                            {message.role === 'user' ? '>_' : 'rr'}
-                          </span>
-                          <strong>
-                            {message.role === 'user'
-                              ? 'You'
-                              : message.role === 'system'
-                                ? 'Workspace'
-                                : 'Research agent'}
-                          </strong>
-                          <time dateTime={message.createdAt}>{formatTime(message.createdAt)}</time>
-                        </div>
-                        <p>{message.content}</p>
-                        <span className="message-state">
-                          <Icon name="check" size={12} />
-                          Saved locally
-                        </span>
-                      </article>
-                    ))}
-                    <div ref={messageEnd} />
-                  </div>
+                  <ConversationMessages detail={detail} />
                 ) : (
                   <div className="conversation-empty">
                     <span className="empty-symbol" aria-hidden="true">
-                      {'>'}_
+                      RR
                     </span>
-                    <p className="eyebrow">A QUESTION IS A STARTING POINT</p>
-                    <h2>
-                      What would you like
-                      <br />
-                      to understand?
-                    </h2>
-                    <p>
-                      Describe the topic, add context, and define what a useful answer would look
-                      like. Your brief will be saved here.
-                    </p>
                   </div>
                 )}
+                <div ref={messageEnd} />
               </div>
-              <form className="composer" onSubmit={(event) => void saveBrief(event)}>
-                <label htmlFor="research-brief" className="visually-hidden">
-                  Research brief
+              {!connected && provider.status && (
+                <div className="composer-connection">
+                  <span>
+                    {provider.status.state === 'unavailable'
+                      ? 'Codex is unavailable.'
+                      : 'Connect Codex to start.'}
+                  </span>
+                  <button type="button" className="text-button" onClick={onConfigure}>
+                    Open configuration
+                    <Icon name="arrow" size={13} />
+                  </button>
+                </div>
+              )}
+              {provider.error && (
+                <p className="inline-error" role="alert">
+                  {provider.error}
+                </p>
+              )}
+              {modelUnavailable && (
+                <p className="inline-error" role="alert">
+                  Choose an available model to continue.
+                </p>
+              )}
+              <form className="composer" onSubmit={(event) => void send(event)}>
+                <label htmlFor="chat-message" className="visually-hidden">
+                  {activeRun
+                    ? 'Steer this run'
+                    : mode === 'research'
+                      ? 'Research topic'
+                      : 'Message'}
                 </label>
                 <textarea
-                  id="research-brief"
-                  placeholder="Ask a question. Follow an idea. Outline your research…"
+                  id="chat-message"
+                  placeholder={
+                    activeRun
+                      ? 'Add direction to this run…'
+                      : mode === 'research'
+                        ? 'What would you like to research?'
+                        : 'Message…'
+                  }
                   value={draft}
-                  onChange={(event) => {
-                    setDraft(event.target.value);
-                    setNotice('');
-                  }}
+                  onChange={(event) => setDraft(event.target.value)}
                   maxLength={50000}
-                  rows={4}
+                  rows={3}
                   disabled={busy || !project.available}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                      event.preventDefault();
+                      event.currentTarget.form?.requestSubmit();
+                    }
+                  }}
                 />
-                <div className="composer-toolbar">
-                  <span>
-                    <Icon name="file" size={13} />
-                    Research brief
-                  </span>
+                <div className="composer-options">
+                  <div className="mode-selector" role="group" aria-label="Task type">
+                    <button
+                      type="button"
+                      aria-pressed={selectedMode === 'chat'}
+                      disabled={Boolean(activeRun) || busy}
+                      onClick={() => setMode('chat')}
+                    >
+                      <Icon name="chat" size={13} />
+                      Chat
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={selectedMode === 'research'}
+                      disabled={Boolean(activeRun) || busy}
+                      onClick={() => setMode('research')}
+                    >
+                      <Icon name="search" size={13} />
+                      Research job
+                    </button>
+                  </div>
+                  <ModelControls
+                    compact
+                    models={provider.models}
+                    model={activeRun?.model ?? model}
+                    reasoningEffort={activeRun?.reasoningEffort ?? reasoningEffort}
+                    onModelChange={setModel}
+                    onReasoningChange={setReasoningEffort}
+                    disabled={Boolean(activeRun) || busy || !connected}
+                  />
                   <button
                     type="submit"
-                    className="button primary small"
-                    disabled={busy || !draft.trim() || !project.available}
+                    className="button primary small send-button"
+                    disabled={
+                      busy ||
+                      !draft.trim() ||
+                      !project.available ||
+                      !connected ||
+                      modelUnavailable ||
+                      activeRun?.status === 'queued'
+                    }
                   >
-                    {busy ? 'Saving…' : 'Save brief'}
+                    {busy
+                      ? 'Sending…'
+                      : activeRun
+                        ? 'Send update'
+                        : mode === 'research'
+                          ? 'Start research'
+                          : 'Send'}
                     <Icon name="arrow" size={14} />
                   </button>
                 </div>
               </form>
-              <p className="composer-caption" role="status">
-                {notice || 'Briefs are saved locally. Agent execution is not connected yet.'}
-              </p>
             </>
           )}
           {tab === 'activity' && (
             <div className="activity-view">
-              <div className="section-title-row">
-                <h2>Research activity</h2>
-                <span>Live workspace events</span>
-              </div>
               {detail?.events.length ? (
                 <ol className="activity-list">
                   {detail.events.map((event) => (
@@ -289,42 +375,33 @@ export function ResearchWorkspace({
                       <span className="activity-dot" />
                       <div>
                         <strong>{event.summary}</strong>
-                        <span>{event.type}</span>
                       </div>
                       <time dateTime={event.createdAt}>{formatTime(event.createdAt)}</time>
                     </li>
                   ))}
                 </ol>
               ) : (
-                <div className="section-empty">
-                  <Icon name="activity" size={25} />
-                  <h3>Room for the process.</h3>
-                  <p>
-                    Save a brief to begin the activity log. Future research runs will add agent
-                    progress, sources, and steering events here.
-                  </p>
-                </div>
+                <p className="section-empty">No activity yet.</p>
               )}
             </div>
           )}
           {tab === 'files' && (
             <div className="files-view">
-              <div className="section-title-row">
-                <h2>Project files</h2>
-                <span>
-                  {artifacts.length} {artifacts.length === 1 ? 'file' : 'files'}
-                </span>
-              </div>
-              <p className="muted-copy">
-                Files managed by RecursiveResearch in your connected folder.
-              </p>
               {artifacts.length ? (
                 <ul className="file-list">
                   {artifacts.map((artifact) => (
                     <li key={artifact.relativePath}>
                       <Icon name="file" size={19} />
                       <div>
-                        <strong>{artifact.name}</strong>
+                        <a
+                          className="artifact-link"
+                          href={`/api/projects/${encodeURIComponent(project.id)}/artifact?path=${encodeURIComponent(artifact.relativePath)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <strong>{artifact.name}</strong>
+                          <Icon name="external" size={12} />
+                        </a>
                         <span title={artifact.relativePath}>{artifact.relativePath}</span>
                       </div>
                       <span className="file-size">{formatSize(artifact.size)}</span>
@@ -332,48 +409,11 @@ export function ResearchWorkspace({
                   ))}
                 </ul>
               ) : (
-                <div className="section-empty">
-                  <Icon name="folder" size={25} />
-                  <h3>Everything has a place.</h3>
-                  <p>
-                    Your saved briefs and future research artifacts will live in this project
-                    folder. No research artifacts have been generated yet.
-                  </p>
-                </div>
+                <p className="section-empty">No files yet.</p>
               )}
             </div>
           )}
         </section>
-        <aside className="research-context" aria-label="Research context">
-          <div className="context-section">
-            <p className="eyebrow">+-- research status</p>
-            <h2>{detail?.messages.length ? 'A question to build on.' : 'Ready for your brief.'}</h2>
-            <p>
-              Capture the question now.
-              <br />
-              Build the research process next.
-            </p>
-            <div className="context-state">
-              <span className="status-dot" />
-              Harness not connected
-            </div>
-          </div>
-          <div className="context-section">
-            <p className="eyebrow">+-- working directory</p>
-            <Icon name="folder" size={20} />
-            <strong className="context-project-name">{project.name}</strong>
-            <p className="context-path">{project.folderPath}</p>
-            <span className="context-small">Saved on your computer</span>
-          </div>
-          <div className="context-section">
-            <p className="eyebrow">+-- agent defaults</p>
-            <p>Set your Codex connection and preferences before building the harness.</p>
-            <button type="button" className="text-button" onClick={onConfigure}>
-              Configuration
-              <Icon name="arrow" size={13} />
-            </button>
-          </div>
-        </aside>
       </div>
     </div>
   );

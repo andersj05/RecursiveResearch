@@ -18,7 +18,6 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [revision, setRevision] = useState(0);
-  const [connected, setConnected] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -33,11 +32,9 @@ export function App() {
     void refresh();
     const stream = new EventSource('/api/events');
     stream.onopen = () => {
-      setConnected(true);
       void refresh();
       setRevision((current) => current + 1);
     };
-    stream.onerror = () => setConnected(false);
     stream.addEventListener('workspace.changed', () => {
       void refresh();
       setRevision((current) => current + 1);
@@ -80,7 +77,7 @@ export function App() {
   async function newChat(next: Project) {
     setBusy(true);
     try {
-      const created = await api.createChat(next.id, 'New research');
+      const created = await api.createChat(next.id, 'New chat');
       chatCreated(created);
       selectProject(next, created);
       await refresh();
@@ -136,7 +133,9 @@ export function App() {
             setSidebarOpen(false);
           }}
         >
-          <span className="brand-mark">{'>'}_</span>
+          <span className="brand-mark" aria-hidden="true">
+            RR
+          </span>
           <span>
             Recursive<span className="brand-second">Research</span>
           </span>
@@ -149,11 +148,10 @@ export function App() {
             disabled={!workspace}
           >
             <Icon name="plus" size={15} />
-            New project<span className="button-end">+</span>
+            New project
           </button>
           <div className="sidebar-section-label">
-            <span>PROJECTS</span>
-            <span>{String(workspace?.projects.length ?? 0).padStart(2, '0')}</span>
+            <span>Projects</span>
           </div>
           <nav className="project-navigation" aria-label="Projects and chats">
             {workspace?.projects.length ? (
@@ -230,7 +228,7 @@ export function App() {
                             disabled={busy || !item.available}
                             onClick={() => void newChat(item)}
                           >
-                            + Start a conversation
+                            + New chat
                           </button>
                         )}
                       </div>
@@ -240,13 +238,7 @@ export function App() {
               })
             ) : (
               <div className="empty-projects">
-                <Icon name="folder" size={23} />
-                <p>
-                  A folder for every
-                  <br />
-                  line of inquiry.
-                </p>
-                <span>Your projects will appear here.</span>
+                <span>No projects yet</span>
               </div>
             )}
           </nav>
@@ -262,13 +254,6 @@ export function App() {
             Configuration
             <Icon name="chevron" size={12} />
           </button>
-          <div className="sidebar-footer">
-            <span>
-              <span className={`status-dot ${connected ? 'online' : ''}`} />
-              {connected ? 'Local workspace' : 'Connecting…'}
-            </span>
-            <span>v0.1</span>
-          </div>
         </div>
       </aside>
       <div className="main-shell">
@@ -283,7 +268,6 @@ export function App() {
             >
               <Icon name="menu" />
             </button>
-            <span className="header-prompt">~/</span>
             <button
               type="button"
               onClick={() => {
@@ -292,12 +276,12 @@ export function App() {
                 setChatId(null);
               }}
             >
-              workspace
+              Home
             </button>
-            <span className="path-divider">/</span>
-            <span>
-              {view === 'configuration' ? 'configuration' : (project?.name ?? 'overview')}
-            </span>
+            {(view === 'configuration' || project) && <span className="path-divider">/</span>}
+            {(view === 'configuration' || project) && (
+              <span>{view === 'configuration' ? 'Configuration' : project?.name}</span>
+            )}
           </div>
           {project && view === 'workspace' ? (
             <button
@@ -309,12 +293,7 @@ export function App() {
               <Icon name="plus" size={13} />
               New chat
             </button>
-          ) : (
-            <span className="header-meta">
-              <span className="status-dot online" />
-              LOCAL FIRST
-            </span>
-          )}
+          ) : null}
         </header>
         <main id="main-content" tabIndex={-1}>
           {error && (
@@ -328,8 +307,10 @@ export function App() {
           )}
           {!workspace ? (
             <div className="startup-state">
-              <span className="brand-mark">{'>'}_</span>
-              <h1>Opening your workspace.</h1>
+              <span className="brand-mark" aria-hidden="true">
+                RR
+              </span>
+              <h1>Opening workspace…</h1>
               <p>
                 {error
                   ? 'Start the local server, then retry the connection.'
@@ -344,6 +325,7 @@ export function App() {
               project={project}
               chat={chat}
               revision={revision}
+              settings={workspace.settings}
               onChatCreated={chatCreated}
               onSaved={() => {
                 void refresh();
@@ -353,7 +335,8 @@ export function App() {
             />
           ) : (
             <Welcome
-              projectCount={workspace.projects.length}
+              projects={workspace.projects}
+              onSelect={selectProject}
               onCreate={() => setShowProjectDialog(true)}
               onConfigure={configure}
             />
