@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev, 'feat/**']
+  pull_request:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  branch-flow:
+    name: Branch flow
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Validate pull request route
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPOSITORY: ${{ github.repository }}
+        run: |
+          node <<'NODE'
+          const { BASE_REF, HEAD_REF, HEAD_REPOSITORY, BASE_REPOSITORY } = process.env;
+          const feature = BASE_REF === 'dev' && /^feat\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(HEAD_REF ?? '');
+          const release = BASE_REF === 'main' && HEAD_REF === 'dev' && HEAD_REPOSITORY === BASE_REPOSITORY;
+          if (!feature && !release) {
+            console.error('Use feat/<kebab-case-name> -> dev for normal changes, or this repository\'s dev -> main for a release.');
+            process.exit(1);
+          }
+          NODE
+
+  check:
+    name: Check (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
