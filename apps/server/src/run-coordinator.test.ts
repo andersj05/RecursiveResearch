@@ -340,8 +340,14 @@ describe('sequential research harness', () => {
     await vi.waitFor(async () => expect((await store.run(run.id)).status).toBe('completed'), {
       timeout: 5000,
     });
-    expect((await store.run(run.id)).harness?.answer).toBe('Europe');
-    expect(vi.mocked(provider.executeTurn).mock.calls[1]?.[0].prompt).toContain('Europe');
+    const acceptedAnswer = answers[0]?.status === 'fulfilled' ? 'Europe' : 'Asia';
+    expect((await store.run(run.id)).harness?.answer).toBe(acceptedAnswer);
+    expect(vi.mocked(provider.executeTurn).mock.calls[1]?.[0].prompt).toContain(acceptedAnswer);
+    expect(
+      (await store.chat(chat.id)).messages
+        .filter((message) => ['Europe', 'Asia'].includes(message.content))
+        .map((message) => message.content),
+    ).toEqual([acceptedAnswer]);
   });
   it('enforces the round budget even when every review requests more research', async () => {
     const { coordinator, store, chat, provider } = await fixture(
