@@ -11,6 +11,7 @@ import {
 } from 'node:fs/promises';
 import { homedir, hostname } from 'node:os';
 import path from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { z } from 'zod';
 import {
   projectSchema,
@@ -190,7 +191,19 @@ async function atomicJson(target: string, data: unknown): Promise<void> {
   try {
     await writeFile(temporary, `${JSON.stringify(data, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
     assertFileLocksHeld();
-    await rename(temporary, target);
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await rename(temporary, target);
+        break;
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (!['EACCES', 'EBUSY', 'EPERM'].includes(code ?? '') || attempt === 5) throw error;
+        // Windows scanners and indexers can briefly hold the destination. Keep
+        // the writer lock while retrying the same atomic replacement.
+        assertFileLocksHeld();
+        await delay(20 * (attempt + 1));
+      }
+    }
   } finally {
     await unlink(temporary).catch((error: unknown) => {
       if (!isMissing(error)) throw error;

@@ -101,7 +101,9 @@ describe('Codex run coordination', () => {
   it('sends selected model/thinking, persists the answer and resumes the conversation', async () => {
     const { store, chat, coordinator, provider, notify } = await fixture();
     const run = await coordinator.start(chat.id, input);
-    await vi.waitFor(async () => expect((await store.run(run.id)).status).toBe('completed'));
+    await vi.waitFor(async () => expect((await store.run(run.id)).status).toBe('completed'), {
+      timeout: 3000,
+    });
     const detail = await store.chat(chat.id);
     expect(detail.messages.map((message) => message.content)).toEqual([
       input.content,
@@ -132,7 +134,9 @@ describe('Codex run coordination', () => {
   it('saves a completed research job as an artifact in its own project', async () => {
     const { store, chat, project, coordinator, provider } = await fixture();
     const run = await coordinator.start(chat.id, { ...input, mode: 'research' });
-    await vi.waitFor(async () => expect((await store.run(run.id)).status).toBe('completed'));
+    await vi.waitFor(async () => expect((await store.run(run.id)).status).toBe('completed'), {
+      timeout: 3000,
+    });
     const completed = await store.run(run.id);
     expect(completed.reportPath).toBeTruthy();
     expect(await store.readArtifact(project.id, completed.reportPath!)).toContain(
