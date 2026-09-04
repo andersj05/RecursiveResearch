@@ -15,6 +15,10 @@ RecursiveResearch is a local research workspace with user-selected project folde
 - Preserve concise source observations and actual tool metadata; exclude private reasoning, raw diagnostics, and credentials.
 - Follow `main -> dev -> feat/<feature>`, frequent conventional commits, and the root validation check.
 
+## Navigation
+
+Harness is configuration and technical reference only. All chat/research execution belongs to project chats, including per-run settings, history, sources, reports, clarification, and controls. Configuration manages the Codex connection and model defaults.
+
 ## Current product boundary
 
 Chat uses a managed turn with continuity. New UI Research jobs plan, delegate parallel researchers/skeptics, retain source observations, propose child questions, synthesize gaps/contradictions, and iterate within explicit limits. Clarification pauses durably; steering reaches active and subsequent work; Stop cancels active and queued children. Expert views expose lineage, tools, requests, runtime launch arguments, algorithms, and reports. Legacy single-turn and sequential jobs remain compatible.

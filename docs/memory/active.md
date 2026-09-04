@@ -4,12 +4,12 @@
 
 ## Current objective
 
-Adaptive delegated research and an expert dashboard are implemented on `feat/research-harness`, revising open PR #1 into `dev`. See [the plan](../plans/adaptive-research.md) and [architecture](../architecture/RESEARCH_HARNESS.md).
+The project-owned research flow is implemented on `feat/research-harness`, revising open PR #1 into `dev`. Harness now contains configuration/reference only; project chats own research. The stale running server was refreshed with its verified existing registry and project/chat IDs preserved. See [the plan](../plans/project-research-flow.md).
 
 ## Immediate next actions
 
-- Final local validation passed 73 tests and the production build. [PR #1](https://github.com/andersj05/RecursiveResearch/pull/1) is published; Windows and Ubuntu CI passed the implementation revision.
-- Review the research UX and bounded runtime before integration into `dev`. Release promotion into `main` remains separate.
+- Review PR #1 with the revised navigation. Local root validation passed 76 tests and the production build; final UI refinements also build successfully. Check the PR for current CI results.
+- Review the revised project chat workflow before integration into `dev`. Release promotion into `main` remains separate.
 
 ## Blockers
 

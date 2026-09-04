@@ -1,6 +1,14 @@
 # Adaptive research harness
 
-Research jobs launched in the UI use version 2: bounded parallel research with an evolving question frontier. Existing version-1 sequential jobs remain readable and can continue a saved clarification. Direct API clients may still request the legacy single-turn or sequential paths. See [ADR-0008](../adr/0008-server-owned-adaptive-research.md).
+Research jobs launched in the UI use version 2: bounded parallel research with an evolving question frontier. Existing version-1 sequential jobs remain readable and can continue a saved clarification. Direct API clients may still request the legacy single-turn or sequential paths. See [ADR-0008](../adr/0008-server-owned-adaptive-research.md) and [ADR-0009](../adr/0009-project-owned-research-flow.md).
+
+## Navigation and configuration
+
+The Harness sidebar page contains global research defaults and technical reference only. It has no project selector, chat composer, run launcher, or run history. Research starts from a project chat by choosing Research next to Chat. The composer exposes per-run limits; the project Research tab owns run history, execution, source observations, and reports. Clarification, steering, and Stop stay in the same project chat.
+
+`HarnessConfig.research` persists adaptive defaults; older registries receive the standard defaults when parsed. Each launch copies its chosen limits into the run. A per-run override does not change global defaults. Codex connection and model defaults remain on Configuration; research guidance and the global concurrency ceiling live on Harness.
+
+The health endpoint exposes a shared API compatibility version. Before a mutation the browser verifies compatibility; an outdated server produces a clear restart/reload message and no mutation is sent. This guards against a long-running server serving newly rebuilt browser assets with an older request schema. Rebuilding static assets does not restart the production server.
 
 ## Execution graph
 

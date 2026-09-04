@@ -4,7 +4,7 @@ A local workspace for focused research with Codex.
 Organize projects and chats, keep research in folders you choose, and run chat or web research jobs from one restrained interface.
 
 Chat uses one managed Codex turn. Research delegates parallel source investigations, follows new questions, and iterates through synthesis within explicit budgets.
-The Research harness page shows agents, tool calls, source observations, loop decisions, and expert runtime details. Experiments and independent citation verification remain future work.
+Start research from a project chat by switching Chat to Research. Its Research tab shows agents, tool calls, sources, and reports. The Harness page contains saved research defaults and expert runtime information. Experiments and independent citation verification remain future work.
 
 ## Start developing
 
@@ -65,3 +65,5 @@ The branch hierarchy is `main -> dev -> feat/<feature>`: feature pull requests t
 Use small conventional commits as work progresses.
 
 [Documentation map](docs/README.md) · [Current state](docs/memory/progress.md) · [Roadmap](docs/PROJECT_PLAN.md)
+
+After changing server code or shared contracts, stop and restart the local server before using a rebuilt browser bundle. Refresh the browser after the restart. The UI checks API compatibility before sending changes and reports a clear restart instruction if the server is outdated.

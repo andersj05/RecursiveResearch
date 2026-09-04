@@ -12,12 +12,16 @@ The released single-turn foundation remains on `main` and `dev`. `feat/research-
 - Durable clarification, run-level steering, stop propagation, partial-child failure handling, and interrupted-task recovery after owner exit.
 - A dashboard for agent lineage, status, requests, thread/turn IDs, actual web search/open/find arguments, loop decisions, synthesis, and evidence.
 - An expert architecture panel showing actual process launch arguments, protocol methods, role tool access, context selection, and stop rules.
-- Research mode in the conversation UI now starts the adaptive harness and opens Orchestration. Chat remains concise and single-turn.
+- Project chats own Chat/Research mode, per-run limits, research history, execution, sources, and reports. Harness contains only saved research defaults and technical reference; Configuration owns connection/model defaults. Chat remains concise and single-turn.
 - Provider-native delegation, shell, filesystem mutation, connected apps, external MCP, experiments, and project-instruction loading remain disabled. Server-managed delegation uses isolated restricted turns.
 
 ## Verification
 
-- The final expanded root check passed formatting, lint, strict TypeScript, all 73 tests, and the production build. This includes clarification after restart, durable steering, infrastructure cancellation, maximum-sized context, and abandoned-task recovery.
+- The stale local server was confirmed to lack harness support despite serving newer UI assets. It was refreshed using its matching existing registry; project and chat IDs were preserved. A valid adaptive request against a nonexistent chat now reaches chat lookup (`CHAT_NOT_FOUND`) rather than failing schema validation, without invoking research.
+- Regression tests cover rejection of incompatible browser mutations, intact adaptive request transmission, actual HTTP harness acceptance, and migration/persistence of research defaults.
+- Browser fixtures verify the configuration-only Harness page, saved defaults, a project-specific launch override, execution, source/report access, multiple runs in a chat, and clarification/continuation/Stop. Narrow layouts were inspected and refined.
+
+- The final expanded root check passed formatting, lint, strict TypeScript, all 76 tests, and the production build. This includes clarification after restart, durable steering, infrastructure cancellation, maximum-sized context, and abandoned-task recovery.
 - Live GPT-5.4-Mini / low research completed with two simultaneous researcher turns, eight retained sources, 21 real search/open/find actions, synthesis, and a saved report. The configured source cap stopped the run after one cycle.
 - Fixture tests verify two-cycle evolution, source merging, child lineage, budgets, partial failure, stop propagation, structured-output rejection, and global pool cancellation.
 - Browser fixture verification covered launch, a second research cycle, tool filtering and expanded arguments, interactive topology, chat Research opening Orchestration, clarification/continuation/Stop, and desktop/390px layouts without horizontal overflow. The saved live-run trace and actual launch descriptor were also inspected in the browser.
