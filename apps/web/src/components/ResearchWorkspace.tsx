@@ -106,7 +106,8 @@ export function ResearchWorkspace({
     setError(null);
     try {
       if (activeRun) {
-        await api.steerRun(activeRun.id, draft.trim());
+        if (activeRun.status === 'waiting') await api.answerRun(activeRun.id, draft.trim());
+        else await api.steerRun(activeRun.id, draft.trim());
       } else {
         const target =
           createdChat.current ??
@@ -356,7 +357,9 @@ export function ResearchWorkspace({
                     {busy
                       ? 'Sending…'
                       : activeRun
-                        ? 'Send update'
+                        ? activeRun.status === 'waiting'
+                          ? 'Continue research'
+                          : 'Send update'
                         : mode === 'research'
                           ? 'Start research'
                           : 'Send'}

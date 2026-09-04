@@ -75,6 +75,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(input),
     }),
+  answerRun: (runId: string, content: string) =>
+    request<Run>(`/runs/${encodeURIComponent(runId)}/answer`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    }),
   stopRun: (runId: string) =>
     request<Run>(`/runs/${encodeURIComponent(runId)}/cancel`, {
       method: 'POST',

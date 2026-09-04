@@ -73,5 +73,13 @@ export function useConversation(projectId: string, chatId: string | undefined, r
     refreshRef.current();
   }, [revision]);
 
-  return { detail, artifacts, error, loading, reconnecting, refresh: () => refreshRef.current() };
+  const currentDetail = detail?.chat.id === chatId ? detail : null;
+  return {
+    detail: currentDetail,
+    artifacts,
+    error,
+    loading: loading || Boolean(chatId && !currentDetail && !error),
+    reconnecting,
+    refresh: () => refreshRef.current(),
+  };
 }

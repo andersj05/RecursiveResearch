@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Chat, Project, Workspace } from '@recursive-research/contracts';
+import { HarnessPage } from './components/HarnessPage';
 import { Configuration } from './components/Configuration';
 import { Icon } from './components/Icon';
 import { ProjectDialog } from './components/ProjectDialog';
@@ -9,7 +10,13 @@ import { api, describeError } from './lib/api';
 
 export function App() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [view, setView] = useState<'workspace' | 'configuration'>('workspace');
+  const [view, setView] = useState<'workspace' | 'configuration' | 'harness'>(window.location.hash.startsWith('#harness') ? 'harness' : 'workspace');
+  useEffect(() => {
+    if (view === 'harness') window.history.replaceState(null, '', '#harness');
+    else if (window.location.hash.startsWith('#harness'))
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  }, [view]);
+
   const [projectId, setProjectId] = useState<string | null>(null);
   const [chatId, setChatId] = useState<string | null>(null);
   const [showProjectDialog, setShowProjectDialog] = useState(false);
@@ -246,6 +253,19 @@ export function App() {
         <div className="sidebar-bottom">
           <button
             type="button"
+            className={`configuration-link ${view === 'harness' ? 'active' : ''}`}
+            aria-current={view === 'harness' ? 'page' : undefined}
+            onClick={() => {
+              setView('harness');
+              setSidebarOpen(false);
+            }}
+          >
+            <Icon name="activity" size={16} />
+            Research harness
+            <Icon name="chevron" size={12} />
+          </button>
+          <button
+            type="button"
             className={`configuration-link ${view === 'configuration' ? 'active' : ''}`}
             aria-current={view === 'configuration' ? 'page' : undefined}
             onClick={configure}
@@ -278,9 +298,15 @@ export function App() {
             >
               Home
             </button>
-            {(view === 'configuration' || project) && <span className="path-divider">/</span>}
-            {(view === 'configuration' || project) && (
-              <span>{view === 'configuration' ? 'Configuration' : project?.name}</span>
+            {(view !== 'workspace' || project) && <span className="path-divider">/</span>}
+            {(view !== 'workspace' || project) && (
+              <span>
+                {view === 'configuration'
+                  ? 'Configuration'
+                  : view === 'harness'
+                    ? 'Research harness'
+                    : project?.name}
+              </span>
             )}
           </div>
           {project && view === 'workspace' ? (
@@ -319,6 +345,18 @@ export function App() {
             </div>
           ) : view === 'configuration' ? (
             <Configuration settings={workspace.settings} onSaved={() => void refresh()} />
+          ) : view === 'harness' ? (
+            <HarnessPage
+              workspace={workspace}
+              revision={revision}
+              initialProjectId={projectId}
+              onSaved={() => {
+                void refresh();
+                setRevision((current) => current + 1);
+              }}
+              onConfigure={configure}
+              onCreateProject={() => setShowProjectDialog(true)}
+            />
           ) : project ? (
             <ResearchWorkspace
               key={`${project.id}:${chat?.id ?? 'new'}`}
