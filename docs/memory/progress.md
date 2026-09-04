@@ -2,63 +2,46 @@
 
 **Last reviewed:** 2026-09-04
 
-## Implementation status
+## Implemented
 
-The local application foundation and managed single-turn runtime are implemented on `feat/project-foundation`.
-The workspace includes the simplified Portfolio-derived RR interface, local backend, shared schemas, durable job storage, restricted Codex adapter, provider-neutral harness guidance, contributor memory, six ADRs, CI, and review templates.
+The release includes the single-turn foundation and the [adaptive research harness](../architecture/RESEARCH_HARNESS.md), with legacy sequential compatibility.
 
-## Implemented capabilities
+- Project-owned chats, durable runs, streamed answers, reports, and a managed Codex subscription with account-visible model/thinking controls.
+- Autonomous planner, parallel researcher/skeptic assignments, parent/child question discovery, prioritized frontier, source observations, iterative synthesis, and concise reports.
+- Server-enforced task/depth/cycle/source/time limits plus a shared cancellable provider turn pool across jobs.
+- Durable clarification, run-level steering, stop propagation, partial-child failure handling, and interrupted-task recovery after owner exit.
+- A dashboard for agent lineage, status, requests, thread/turn IDs, actual web search/open/find arguments, loop decisions, synthesis, and evidence.
+- An expert architecture panel showing actual process launch arguments, protocol methods, role tool access, context selection, and stop rules.
+- Project chats own Chat/Research mode, per-run limits, research history, execution, sources, and reports. Harness contains only saved research defaults and technical reference; Configuration owns connection/model defaults. Chat remains concise and single-turn.
+- Provider-native delegation, shell, filesystem mutation, connected apps, external MCP, experiments, and project-instruction loading remain disabled. Server-managed delegation uses isolated restricted turns.
 
-- Projects connect to existing folders; nested chats, messages, jobs, events, and report paths persist in project-owned metadata.
-- The home and conversation views remove ornamental labels and repeated explanations, use the `RR` mark, and keep real projects and primary actions central.
-- Configuration reuses the managed Codex subscription and presents actual account, model, supported-thinking, and usage state.
-- Each submission can run in Chat or Research mode with per-turn model and thinking selection.
-- Assistant output streams into a durable placeholder; the active turn supports stop and accepted in-turn steering.
-- Later messages resume the chat's stored Codex thread.
-- A completed Research answer is saved once as `artifacts/research-<run-id>.md` and can be opened from the result or Files surface.
-- Server events refresh job progress and authoritative workspace state after reconnecting.
-- Execution uses process-local restrictions, a read-only filesystem sandbox, disabled sandbox network access, and `approvalPolicy: never`.
-- Shell execution, connected apps, plugins, MCP servers, multi-agent delegation, hooks, memories, project instructions, computer/browser control, image generation, and code-mode tools are disabled; only Research mode enables built-in web search.
-- Provider reasoning, tool arguments, and raw diagnostics do not cross the adapter boundary.
-- Stale active jobs are marked interrupted after their owner process exits, and partial assistant output is retained.
+## Verification
 
-## Verification completed
+- The stale local server was confirmed to lack harness support despite serving newer UI assets. It was refreshed using its matching existing registry; project and chat IDs were preserved. A valid adaptive request against a nonexistent chat now reaches chat lookup (`CHAT_NOT_FOUND`) rather than failing schema validation, without invoking research.
+- Regression tests cover rejection of incompatible browser mutations, intact adaptive request transmission, actual HTTP harness acceptance, and migration/persistence of research defaults.
+- Browser fixtures verify the configuration-only Harness page, saved defaults, a project-specific launch override, execution, source/report access, multiple runs in a chat, and clarification/continuation/Stop. Narrow layouts were inspected and refined.
 
-- Frontend formatting, TypeScript, and lint checks pass for the simplified interface and runtime controls.
-- Fourteen provider fixtures pass for account/protocol behavior, new and resumed turns, streaming, research progress, steering, cancellation, final-answer filtering, malformed responses, and process-local restrictions.
-- The installed-Codex metadata probe reused the existing account and returned connected state, account-visible models, and usage buckets without inference or authentication changes.
-- The native execution-policy probe verified process-local tool restrictions, a read-only no-network sandbox, `approvalPolicy: never`, and an empty external MCP inventory without inference.
-- Eight coordinator tests pass for model/thinking selection, streamed persistence, thread resume, reports, stop, steering, validation, concurrency, timeouts, disconnected storage, terminal-write reconciliation, and empty-report failure handling.
-- Storage job tests pass for lifecycle persistence, report publication, artifact preview safety, ownership, restart interruption, and single-active-job enforcement.
-- The final integrated `npm run check` passed formatting, lint, strict TypeScript, all 42 tests, and the production build, including cross-process project writers and project isolation.
-- Earlier browser checks verified project creation, nested chats, provider metadata, configuration persistence, desktop/mobile layout, and production startup.
-- A production browser smoke reused the connected Codex subscription and completed both Chat and Research turns with GPT-5.4-Mini at low thinking.
-- That live smoke verified per-turn selection, streamed conversation output, a resumed provider thread, durable messages and jobs, a completed Markdown report, and the Files surface.
-- The final homepage and Codex configuration were visually inspected after the production build.
+- The final expanded root check passed formatting, lint, strict TypeScript, all 76 tests, and the production build. This includes clarification after restart, durable steering, infrastructure cancellation, maximum-sized context, and abandoned-task recovery.
+- Live GPT-5.4-Mini / low research completed with two simultaneous researcher turns, eight retained sources, 21 real search/open/find actions, synthesis, and a saved report. The configured source cap stopped the run after one cycle.
+- Fixture tests verify two-cycle evolution, source merging, child lineage, budgets, partial failure, stop propagation, structured-output rejection, and global pool cancellation.
+- Browser fixture verification covered launch, a second research cycle, tool filtering and expanded arguments, interactive topology, chat Research opening Orchestration, clarification/continuation/Stop, and desktop/390px layouts without horizontal overflow. The saved live-run trace and actual launch descriptor were also inspected in the browser.
+- Prior foundation checks cover account metadata, restricted native execution policy, live Chat/Research, thread continuity, storage ownership, cross-process writers, and artifact publication. Prior v1 harness checks cover legacy clarification and five-stage live execution.
 
-## Delivery state
+## Delivery
 
-The foundation history is integrated from `feat/project-foundation` into `dev` and promoted from `dev` into `main` with explicit merge commits.
-All three branches are published to `origin` with `main` as the remote default branch.
-No remote CI result is claimed until GitHub Actions completes, and branch protections are not installed.
+[PR #1](https://github.com/andersj05/RecursiveResearch/pull/1) delivers the feature into `dev`. Final implementation revision `e13a373` passed Windows and Ubuntu CI and branch-flow validation. The owner authorized promotion through `dev` into `main`; GitHub pull request and branch history are the authoritative delivery status.
 
-## Deliberate limitations
+## Limits
 
-- A job runs one managed Codex turn; recursive child agents, automatic evidence reconciliation, and experiments are not implemented.
-- Research reports are model-authored Markdown with ordinary links, not a structured or independently verified citation database.
-- An application restart interrupts an in-flight turn; partial output and the provider thread remain available for a later user message.
-- Codex availability depends on a local supported Codex installation, account access, and remaining usage.
-- Cross-process writer coordination is verified on the local filesystem; network or cloud-synchronized filesystem guarantees are not established.
-- Browser login and cancellation are fixture-verified rather than live-verified.
-- The actual Windows folder chooser was not automated.
+Source summaries, primary-source labels, synthesis, and citations remain model-authored. The lexical context selector uses a subset of the retained notebook and can miss relevant evidence. Source caps do not cap provider-internal web calls. Independent verification and research-quality evaluation across many topics remain future work.
+
+Active research is interrupted after owner exit; saved clarification survives restart. Automatic replay, distributed scheduling, experiments, and connectors are not implemented. Cross-process storage is verified on a local filesystem, not cloud-synchronized/network drives. Live adaptive testing covers successful concurrent research; clarification, cancellation, failures, and two-cycle evolution are fixture-verified.
 
 ## Evidence
 
-- [Workspace architecture](../architecture/OVERVIEW.md)
-- [Managed execution decision](../adr/0006-run-restricted-managed-codex-turns.md)
-- [Provider verification](../architecture/CODEX_PROVIDER.md)
-- [Persistence contract](../architecture/PERSISTENCE.md)
-- [Run coordinator tests](../../apps/server/src/run-coordinator.test.ts)
-- [Storage job tests](../../apps/server/src/storage-runs.test.ts)
-- [Provider fixture tests](../../packages/codex-provider/tests/provider.test.ts)
-- [Cross-process storage tests](../../apps/server/src/storage-lock.test.ts)
+- [Architecture and live verification](../architecture/RESEARCH_HARNESS.md)
+- [Coordinator tests](../../apps/server/src/run-coordinator.test.ts)
+- [Adaptive policy tests](../../packages/harness/src/adaptive.test.ts)
+- [Provider telemetry tests](../../packages/codex-provider/tests/web-tool.test.ts)
+- [Storage tests](../../apps/server/src/storage-runs.test.ts)
+- [Decision](../adr/0008-server-owned-adaptive-research.md)

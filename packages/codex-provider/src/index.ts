@@ -1,3 +1,4 @@
+export { codexLaunchCommand } from './rpc.js';
 import { AppServerRpc, isRecord, type RpcOptions } from './rpc.js';
 import { executionConfig } from './execution-config.js';
 import { TurnExecution } from './turn.js';
@@ -387,6 +388,7 @@ export class CodexProvider {
           model: input.model,
           effort: input.effort,
           summary: 'none',
+          ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
           approvalPolicy: 'never',
           sandboxPolicy: { type: 'readOnly', networkAccess: false },
         });

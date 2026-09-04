@@ -1,8 +1,10 @@
+import { applicationApiVersion } from '@recursive-research/contracts';
 import type {
   Artifact,
   Chat,
   ChatDetail,
   HarnessConfig,
+  HarnessRuntime,
   Message,
   Project,
   Run,
@@ -11,6 +13,13 @@ import type {
 } from '@recursive-research/contracts';
 
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  if (options.method && !['GET', 'HEAD'].includes(options.method.toUpperCase())) {
+    const server = await request<{ apiVersion?: number }>('/health');
+    if (server.apiVersion !== applicationApiVersion)
+      throw new Error(
+        'The page and local server are running different app versions. Restart RecursiveResearch, then reload this page.',
+      );
+  }
   let response: Response;
   try {
     response = await fetch(`/api${path}`, {
@@ -53,6 +62,7 @@ export function describeError(error: unknown): string {
 }
 
 export const api = {
+  harnessRuntime: () => request<HarnessRuntime>('/harness/runtime'),
   workspace: () => request<Workspace>('/workspace'),
   chat: (id: string) => request<ChatDetail>(`/chats/${encodeURIComponent(id)}`),
   artifacts: (projectId: string) =>
@@ -74,6 +84,11 @@ export const api = {
     request<Run>(`/chats/${encodeURIComponent(chatId)}/runs`, {
       method: 'POST',
       body: JSON.stringify(input),
+    }),
+  answerRun: (runId: string, content: string) =>
+    request<Run>(`/runs/${encodeURIComponent(runId)}/answer`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
     }),
   stopRun: (runId: string) =>
     request<Run>(`/runs/${encodeURIComponent(runId)}/cancel`, {

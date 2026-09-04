@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   isActiveRun,
+  defaultAdaptiveOptions,
+  type AdaptiveOptions,
   type Chat,
   type HarnessConfig,
   type Project,
@@ -12,10 +14,13 @@ import { useConversation } from '../hooks/useConversation';
 import { ConversationMessages, formatTime } from './ConversationMessages';
 import { Icon } from './Icon';
 import { ModelControls } from './ModelControls';
+import { ProjectResearch } from './ProjectResearch';
+import { ResearchLimits } from './ResearchLimits';
 
-type WorkspaceTab = 'conversation' | 'activity' | 'files';
-const tabs = [
+type WorkspaceTab = 'conversation' | 'orchestration' | 'activity' | 'files';
+const workspaceTabs = [
   { id: 'conversation', label: 'Conversation', icon: 'chat' },
+  { id: 'orchestration', label: 'Research', icon: 'activity' },
   { id: 'activity', label: 'Activity', icon: 'activity' },
   { id: 'files', label: 'Files', icon: 'file' },
 ] as const;
@@ -45,9 +50,11 @@ export function ResearchWorkspace({
   onSaved: () => void;
   onConfigure: () => void;
 }) {
-  const [tab, setTab] = useState<WorkspaceTab>('conversation');
+  const [selectedTab, setTab] = useState<WorkspaceTab | null>(null);
   const [draft, setDraft] = useState('');
-  const [mode, setMode] = useState<RunMode>('chat');
+  const [chosenMode, setMode] = useState<RunMode | null>(null);
+  const [customLimits, setCustomLimits] = useState<AdaptiveOptions | null>(null);
+  const limits = customLimits ?? settings.research ?? defaultAdaptiveOptions;
   const [model, setModel] = useState(settings.model);
   const [reasoningEffort, setReasoningEffort] = useState(settings.reasoningEffort);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +70,16 @@ export function ResearchWorkspace({
   } = useConversation(project.id, chat?.id, revision);
   const provider = useCodexModels();
   const activeRun = detail?.runs.find(isActiveRun);
+  const mode = chosenMode ?? detail?.runs.at(-1)?.mode ?? 'chat';
+  const tabs = workspaceTabs.filter(
+    (item) => item.id !== 'orchestration' || detail?.runs.some((run) => run.mode === 'research'),
+  );
+  const tab =
+    selectedTab ??
+    (activeRun?.harness?.version === 2 && activeRun.status !== 'waiting'
+      ? 'orchestration'
+      : 'conversation');
+  const researchRun = detail?.runs.filter((run) => run.mode === 'research').at(-1);
   const selectedMode = activeRun?.mode ?? mode;
   const latestProgress = activeRun
     ? [...(detail?.events ?? [])].reverse().find((event) => event.runId === activeRun.id)?.summary
@@ -106,7 +123,10 @@ export function ResearchWorkspace({
     setError(null);
     try {
       if (activeRun) {
-        await api.steerRun(activeRun.id, draft.trim());
+        if (activeRun.status === 'waiting') {
+          await api.answerRun(activeRun.id, draft.trim());
+          setTab('orchestration');
+        } else await api.steerRun(activeRun.id, draft.trim());
       } else {
         const target =
           createdChat.current ??
@@ -124,7 +144,9 @@ export function ResearchWorkspace({
           mode,
           model,
           reasoningEffort: supportedEffort,
+          ...(mode === 'research' ? { harness: limits } : {}),
         });
+        if (mode === 'research') setTab('orchestration');
         onChatCreated(target);
       }
       setDraft('');
@@ -221,8 +243,15 @@ export function ResearchWorkspace({
         <div className="run-progress">
           <span className="status-dot online" />
           <span role="status">
-            {latestProgress ?? (activeRun.status === 'queued' ? 'Starting…' : 'Working…')}
+            {activeRun.status === 'waiting'
+              ? (activeRun.harness?.question ?? 'Waiting for your answer')
+              : (latestProgress ?? (activeRun.status === 'queued' ? 'Starting…' : 'Working…'))}
           </span>
+          {tab !== 'conversation' && (
+            <button className="text-button" type="button" onClick={() => setTab('conversation')}>
+              {activeRun.status === 'waiting' ? 'Answer question' : 'Add direction'}
+            </button>
+          )}
           <button
             className="button small"
             type="button"
@@ -285,7 +314,9 @@ export function ResearchWorkspace({
               <form className="composer" onSubmit={(event) => void send(event)}>
                 <label htmlFor="chat-message" className="visually-hidden">
                   {activeRun
-                    ? 'Steer this run'
+                    ? activeRun.status === 'waiting'
+                      ? 'Answer research question'
+                      : 'Steer this run'
                     : mode === 'research'
                       ? 'Research topic'
                       : 'Message'}
@@ -294,14 +325,20 @@ export function ResearchWorkspace({
                   id="chat-message"
                   placeholder={
                     activeRun
-                      ? 'Add direction to this run…'
+                      ? activeRun.status === 'waiting'
+                        ? 'Your answer…'
+                        : 'Add direction to this run…'
                       : mode === 'research'
                         ? 'What would you like to research?'
                         : 'Message…'
                   }
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
-                  maxLength={50000}
+                  maxLength={
+                    activeRun?.harness?.version === 2 && activeRun.status !== 'waiting'
+                      ? 4000
+                      : 50000
+                  }
                   rows={3}
                   disabled={busy || !project.available}
                   onKeyDown={(event) => {
@@ -311,6 +348,30 @@ export function ResearchWorkspace({
                     }
                   }}
                 />
+                {mode === 'research' && !activeRun && (
+                  <details className="chat-research-options">
+                    <summary>
+                      Research settings · {limits.maxRounds} cycles · {limits.maxAgents} agents ·{' '}
+                      {limits.maxMinutes} min
+                    </summary>
+                    <ResearchLimits value={limits} onChange={setCustomLimits} disabled={busy} />
+                    <div className="chat-research-budget">
+                      <span>
+                        Up to {limits.maxTasks + limits.maxRounds + 2} turns · global concurrency{' '}
+                        {settings.maxParallelAgents}
+                      </span>
+                      {customLimits && (
+                        <button
+                          type="button"
+                          className="text-button"
+                          onClick={() => setCustomLimits(null)}
+                        >
+                          Use harness defaults
+                        </button>
+                      )}
+                    </div>
+                  </details>
+                )}
                 <div className="composer-options">
                   <div className="mode-selector" role="group" aria-label="Task type">
                     <button
@@ -329,7 +390,7 @@ export function ResearchWorkspace({
                       onClick={() => setMode('research')}
                     >
                       <Icon name="search" size={13} />
-                      Research job
+                      Research
                     </button>
                   </div>
                   <ModelControls
@@ -356,7 +417,9 @@ export function ResearchWorkspace({
                     {busy
                       ? 'Sending…'
                       : activeRun
-                        ? 'Send update'
+                        ? activeRun.status === 'waiting'
+                          ? 'Continue research'
+                          : 'Send update'
                         : mode === 'research'
                           ? 'Start research'
                           : 'Send'}
@@ -365,6 +428,9 @@ export function ResearchWorkspace({
                 </div>
               </form>
             </>
+          )}
+          {tab === 'orchestration' && detail && (
+            <ProjectResearch key={researchRun?.id} detail={detail} />
           )}
           {tab === 'activity' && (
             <div className="activity-view">

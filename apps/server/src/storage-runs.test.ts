@@ -5,6 +5,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import {
+  defaultAdaptiveOptions,
+  defaultHarnessConfig,
+  type HarnessState,
+} from '@recursive-research/contracts';
+import { createAdaptiveState, createTask } from '@recursive-research/harness';
 import { WorkspaceStore } from './storage.js';
 
 const input = {
@@ -246,4 +252,95 @@ describe('durable chat and research runs', () => {
       code: 'UNSAFE_PATH',
     });
   });
+});
+
+it('keeps waiting checkpoints after owner exit and atomically claims a single answer', async () => {
+  const { store, chat, registry, documentPath } = await fixture();
+  const state: HarnessState = {
+    version: 1,
+    stage: 'scope',
+    brief: 'Research',
+    maxRounds: 2,
+    maxSources: 3,
+    requirePrimarySources: true,
+    instructions: '',
+    round: 0,
+    question: 'Which region?',
+    answer: null,
+    plan: [],
+    sources: [],
+    gaps: [],
+    steps: [],
+    stopReason: null,
+  };
+  const run = await store.createRun(chat.id, {
+    ...input,
+    mode: 'research',
+    harness: { maxRounds: 2, maxSources: 3 },
+    harnessState: state,
+  });
+  await store.updateRun(run.id, { status: 'waiting', content: 'Which region?' });
+  const document = JSON.parse(await readFile(documentPath, 'utf8'));
+  document.runs[0].owner.pid = 2147483647;
+  await writeFile(documentPath, JSON.stringify(document));
+  const reopened = new WorkspaceStore(registry);
+  await reopened.initialize();
+  expect((await reopened.run(run.id)).status).toBe('waiting');
+  await expect(reopened.createRun(chat.id, input)).rejects.toMatchObject({ code: 'RUN_ACTIVE' });
+  const other = new WorkspaceStore(registry);
+  await other.initialize();
+  const answers = await Promise.allSettled([
+    reopened.answerHarness(run.id, 'Europe'),
+    other.answerHarness(run.id, 'Asia'),
+  ]);
+  expect(answers.filter((answer) => answer.status === 'fulfilled')).toHaveLength(1);
+  expect((await reopened.run(run.id)).harness?.stage).toBe('plan');
+  expect(
+    (await reopened.chat(chat.id)).messages.filter((message) =>
+      ['Europe', 'Asia'].includes(message.content),
+    ),
+  ).toHaveLength(1);
+});
+
+it('interrupts active adaptive assignments on owner exit and cancels a waiting frontier', async () => {
+  const { store, chat, documentPath, registry } = await fixture();
+  const state = createAdaptiveState('Research', defaultAdaptiveOptions, defaultHarnessConfig);
+  createTask(state, 'researcher', 'Investigate', new Date().toISOString()).status = 'running';
+  createTask(state, 'skeptic', 'Check evidence', new Date().toISOString()).status = 'queued';
+  const run = await store.createRun(chat.id, {
+    ...input,
+    mode: 'research',
+    harness: defaultAdaptiveOptions,
+    harnessState: state,
+  });
+  await store.updateRun(run.id, { status: 'running' });
+  const document = JSON.parse(await readFile(documentPath, 'utf8'));
+  document.runs[0].owner.pid = 2147483647;
+  await writeFile(documentPath, JSON.stringify(document));
+  const reopened = new WorkspaceStore(registry);
+  await reopened.initialize();
+  const interrupted = await reopened.run(run.id);
+  expect(interrupted.status).toBe('interrupted');
+  if (interrupted.harness?.version !== 2) throw new Error('Expected adaptive');
+  expect(interrupted.harness.orchestration.tasks.every((t) => t.status === 'interrupted')).toBe(
+    true,
+  );
+  const waitingState = createAdaptiveState(
+    'Research',
+    defaultAdaptiveOptions,
+    defaultHarnessConfig,
+  );
+  waitingState.question = 'Which region?';
+  createTask(waitingState, 'researcher', 'Investigate', new Date().toISOString());
+  const waiting = await reopened.createRun(chat.id, {
+    ...input,
+    mode: 'research',
+    harness: defaultAdaptiveOptions,
+    harnessState: waitingState,
+  });
+  await reopened.updateRun(waiting.id, { status: 'waiting' });
+  await reopened.cancelWaitingHarness(waiting.id);
+  const cancelled = (await reopened.run(waiting.id)).harness;
+  if (cancelled?.version !== 2) throw new Error('Expected adaptive');
+  expect(cancelled.orchestration.tasks[0]?.status).toBe('cancelled');
 });
