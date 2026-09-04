@@ -4,12 +4,10 @@ import { Icon } from './Icon';
 export function Welcome({
   projects,
   onCreate,
-  onConfigure,
   onSelect,
 }: {
   projects: Project[];
   onCreate: () => void;
-  onConfigure: () => void;
   onSelect: (project: Project) => void;
 }) {
   return (
@@ -23,10 +21,12 @@ export function Welcome({
       <section className="welcome-projects" aria-labelledby="projects-heading">
         <div className="section-title-row">
           <h2 id="projects-heading">Projects</h2>
-          <button type="button" className="button primary small" onClick={onCreate}>
-            <Icon name="plus" size={14} />
-            New project
-          </button>
+          {projects.length > 0 && (
+            <button type="button" className="button primary small" onClick={onCreate}>
+              <Icon name="plus" size={14} />
+              New project
+            </button>
+          )}
         </div>
         {projects.length ? (
           <ul className="home-project-list">
@@ -54,11 +54,6 @@ export function Welcome({
           </button>
         )}
       </section>
-      <button type="button" className="text-button welcome-settings" onClick={onConfigure}>
-        <Icon name="settings" size={14} />
-        Codex & configuration
-        <Icon name="arrow" size={13} />
-      </button>
     </div>
   );
 }

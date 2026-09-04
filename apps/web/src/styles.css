@@ -1493,9 +1493,6 @@ h3 {
   color: var(--muted);
   font: 10px var(--mono);
 }
-.welcome-settings {
-  margin-top: 28px;
-}
 .page-intro.compact h1 {
   margin-bottom: 0;
 }

@@ -338,7 +338,6 @@ export function App() {
               projects={workspace.projects}
               onSelect={selectProject}
               onCreate={() => setShowProjectDialog(true)}
-              onConfigure={configure}
             />
           )}
         </main>
