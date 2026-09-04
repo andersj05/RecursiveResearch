@@ -36,21 +36,32 @@ export const researchEventSchema = z.object({
   projectId: idSchema,
   chatId: idSchema,
   runId: idSchema.nullable(),
-  type: z.enum(['brief.saved', 'run.started', 'agent.started', 'source.found', 'note.added', 'steering.accepted', 'run.completed', 'run.failed']),
+  type: z.enum([
+    'brief.saved',
+    'run.started',
+    'agent.started',
+    'source.found',
+    'note.added',
+    'steering.accepted',
+    'run.completed',
+    'run.failed',
+  ]),
   summary: z.string(),
   createdAt: timestamp,
 });
 export type ResearchEvent = z.infer<typeof researchEventSchema>;
 
-export const harnessConfigSchema = z.object({
-  version: z.literal(1),
-  model: z.string().min(1).max(200).nullable(),
-  maxParallelAgents: z.number().int().min(1).max(16),
-  maxDepth: z.number().int().min(1).max(10),
-  maxSourcesPerAgent: z.number().int().min(1).max(100),
-  instructions: z.string().max(20000),
-  requirePrimarySources: z.boolean(),
-}).strict();
+export const harnessConfigSchema = z
+  .object({
+    version: z.literal(1),
+    model: z.string().min(1).max(200).nullable(),
+    maxParallelAgents: z.number().int().min(1).max(16),
+    maxDepth: z.number().int().min(1).max(10),
+    maxSourcesPerAgent: z.number().int().min(1).max(100),
+    instructions: z.string().max(20000),
+    requirePrimarySources: z.boolean(),
+  })
+  .strict();
 export type HarnessConfig = z.infer<typeof harnessConfigSchema>;
 export const defaultHarnessConfig: HarnessConfig = {
   version: 1,
@@ -58,11 +69,14 @@ export const defaultHarnessConfig: HarnessConfig = {
   maxParallelAgents: 3,
   maxDepth: 3,
   maxSourcesPerAgent: 12,
-  instructions: 'Prefer primary sources. Record citations, distinguish evidence from inference, and surface open questions.',
+  instructions:
+    'Prefer primary sources. Record citations, distinguish evidence from inference, and surface open questions.',
   requirePrimarySources: true,
 };
 
-export const createProjectSchema = z.object({ name: projectSchema.shape.name, folderPath: z.string().trim().min(1).max(4000) }).strict();
+export const createProjectSchema = z
+  .object({ name: projectSchema.shape.name, folderPath: z.string().trim().min(1).max(4000) })
+  .strict();
 export const createChatSchema = z.object({ title: chatSchema.shape.title }).strict();
 export const createMessageSchema = z.object({ content: messageSchema.shape.content }).strict();
 
