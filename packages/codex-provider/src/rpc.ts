@@ -18,6 +18,16 @@ export interface RpcOptions {
   requestTimeoutMs?: number;
 }
 
+export function codexLaunchCommand(
+  options: Pick<RpcOptions, 'executable' | 'executableArgs'> = {},
+) {
+  return {
+    executable: options.executable ?? 'codex',
+    args: [...(options.executableArgs ?? []), 'app-server', ...executionConfigArgs],
+    shell: false as const,
+  };
+}
+
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -56,16 +66,13 @@ export class AppServerRpc {
   }
 
   private async connect(): Promise<void> {
-    const child = spawn(
-      this.options.executable ?? 'codex',
-      [...(this.options.executableArgs ?? []), 'app-server', ...executionConfigArgs],
-      {
-        cwd: this.options.cwd,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        windowsHide: true,
-        shell: false,
-      },
-    );
+    const launch = codexLaunchCommand(this.options);
+    const child = spawn(launch.executable, launch.args, {
+      cwd: this.options.cwd,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
+      shell: false,
+    });
     this.child = child;
     const decoder = new StringDecoder('utf8');
     let buffer = '';

@@ -11,6 +11,7 @@
   "dependencies": {
     "@recursive-research/codex-provider": "*",
     "@recursive-research/contracts": "*",
+    "@recursive-research/harness": "*",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-markdown": "^10.1.0"

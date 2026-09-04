@@ -1,5 +1,19 @@
+import { harnessOptionsSchema, sequentialHarnessStateSchema } from './harness.js';
+import {
+  adaptiveHarnessStateSchema,
+  adaptiveOptionsSchema,
+  defaultAdaptiveOptions,
+} from './orchestration.js';
+export * from './orchestration.js';
+export * from './harness.js';
 import { z } from 'zod';
+export const harnessStateSchema = z.discriminatedUnion('version', [
+  sequentialHarnessStateSchema,
+  adaptiveHarnessStateSchema,
+]);
+export type HarnessState = z.infer<typeof harnessStateSchema>;
 
+export const applicationApiVersion = 2;
 export const idSchema = z.uuid();
 const timestamp = z.iso.datetime();
 
@@ -68,6 +82,7 @@ export const harnessConfigSchema = z
     maxSourcesPerAgent: z.number().int().min(1).max(100),
     instructions: z.string().max(20000),
     requirePrimarySources: z.boolean(),
+    research: adaptiveOptionsSchema.default(defaultAdaptiveOptions),
   })
   .strict();
 export type HarnessConfig = z.infer<typeof harnessConfigSchema>;
@@ -81,6 +96,7 @@ export const defaultHarnessConfig: HarnessConfig = {
   instructions:
     'Prefer primary sources. Record citations, distinguish evidence from inference, and surface open questions.',
   requirePrimarySources: true,
+  research: defaultAdaptiveOptions,
 };
 
 export const createProjectSchema = z
@@ -100,6 +116,7 @@ export const runStatusSchema = z.enum([
   'cancelled',
   'failed',
   'interrupted',
+  'waiting',
 ]);
 export const runSchema = z.object({
   id: idSchema,
@@ -118,12 +135,14 @@ export const runSchema = z.object({
   completedAt: timestamp.nullable(),
   error: z.string().nullable(),
   reportPath: z.string().nullable(),
+  harness: harnessStateSchema.nullable().default(null),
 });
 export type Run = z.infer<typeof runSchema>;
 export const startRunSchema = z
   .object({
     content: createMessageSchema.shape.content,
     mode: runModeSchema.default('chat'),
+    harness: z.union([harnessOptionsSchema, adaptiveOptionsSchema]).optional(),
     model: z.string().min(1).max(200).nullable().default(null),
     reasoningEffort: z.string().min(1).max(40).nullable().default(null),
   })
@@ -131,7 +150,7 @@ export const startRunSchema = z
 export type StartRunInput = z.infer<typeof startRunSchema>;
 
 export function isActiveRun(run: Pick<Run, 'status'>): boolean {
-  return run.status === 'queued' || run.status === 'running';
+  return run.status === 'queued' || run.status === 'running' || run.status === 'waiting';
 }
 
 export interface Workspace {

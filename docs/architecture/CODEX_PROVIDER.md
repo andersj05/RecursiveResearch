@@ -37,7 +37,7 @@ Do not turn a quota window into an invented dollar cost.
 
 ## Managed turn policy
 
-Every Chat or Research submission starts one Codex turn and consumes the connected account's available usage.
+Chat and focused Research submissions each start one Codex turn. The opt-in harness executes multiple bounded stages, each consuming the connected account's available usage.
 The server validates the requested model and thinking level against the current account before creating the turn.
 The provider resumes the chat's existing Codex thread when possible.
 
@@ -45,14 +45,14 @@ The child app-server receives process-local restrictions before any turn starts.
 The adapter verifies those restrictions through sanitized configuration metadata and fails closed if they were not applied.
 Each provider thread also sets read-only sandbox permissions, no sandbox network access, and `approvalPolicy: never`.
 
-Disabled capabilities include shell and unified execution, connected apps, plugins, MCP servers, multi-agent delegation, hooks, memories, project-instruction loading, computer or external browser control, image generation, and code-mode tooling.
+Disabled capabilities include shell and unified execution, connected apps, plugins, MCP servers, provider-native multi-agent delegation, hooks, memories, project-instruction loading, computer or external browser control, image generation, and code-mode tooling.
 Chat mode disables web search.
 Research mode enables only Codex's built-in live web search in addition to message generation.
 The model receives the connected project folder as its working-directory context but cannot modify it or invoke project tools.
 The server, rather than the model, publishes a completed research response as a managed Markdown artifact.
 
-Only assistant message deltas, final assistant messages, and short allowlisted progress states cross the adapter boundary.
-Reasoning, tool arguments, protocol diagnostics, and other private payloads are discarded.
+Assistant message deltas, final messages, short progress states, and allowlisted native web actions cross the adapter boundary. Web telemetry includes query, URL, find pattern, and lifecycle only.
+Reasoning, unrelated tool arguments, protocol diagnostics, and private payloads are discarded.
 Stop falls back to closing an unresponsive managed process if Codex does not confirm interruption.
 
 ## Credential and process ownership
@@ -72,8 +72,8 @@ An installed-Codex metadata probe verifies account connectivity separately from 
 A native execution-policy probe verifies the process-local restrictions, read-only sandbox, no-approval policy, and absence of external MCP tools without consuming an inference turn.
 Live model output still requires a separately reported live smoke because fixtures and metadata checks do not consume account usage.
 
-The current runtime starts a single Codex turn for each job.
-It does not implement recursive child agents, autonomous experiment execution, structured source extraction, or independent citation validation.
+The [adaptive harness](RESEARCH_HARNESS.md) launches isolated child threads through the server scheduler; only researchers and skeptics receive web research. Legacy sequential jobs remain supported. Structured sources are validated by the application; the provider schema omits its unsupported URI format.
+Provider-native delegation remains disabled; application-owned child turns are bounded, persisted, and cancelled by the server. Autonomous experiments and independent citation validation are not implemented.
 CLI availability and account access failures leave the rest of the workspace usable.
 
 Protocol reference: [official Codex app-server documentation](https://learn.chatgpt.com/docs/app-server), reviewed 2026-09-04.

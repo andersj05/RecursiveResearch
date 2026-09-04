@@ -58,6 +58,18 @@ describe('Codex turn execution', () => {
     expect(result.text).not.toContain('Checking sources');
   });
 
+  it('forwards per-turn output schemas without changing execution restrictions', async () => {
+    const provider = createProvider('structured-output');
+    const outputSchema = {
+      type: 'object',
+      properties: { answer: { type: 'string' } },
+      required: ['answer'],
+      additionalProperties: false,
+    };
+    const result = await provider.executeTurn({ ...turnInput, outputSchema }, () => {});
+    expect(JSON.parse(result.text)).toEqual(outputSchema);
+  });
+
   it('isolates concurrent threads and resumes stored thread IDs with updated controls', async () => {
     const provider = createProvider();
     const [first, second] = await Promise.all([

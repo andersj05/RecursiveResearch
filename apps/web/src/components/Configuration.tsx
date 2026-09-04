@@ -319,52 +319,6 @@ export function Configuration({
             onModelChange={(model) => change('model', model)}
             onReasoningChange={(effort) => change('reasoningEffort', effort)}
           />
-          <details className="harness-options">
-            <summary>Advanced</summary>
-            <div className="numeric-fields">
-              <label className="field">
-                <span>Concurrent jobs</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={16}
-                  required
-                  value={draft.maxParallelAgents}
-                  onChange={(event) => change('maxParallelAgents', Number(event.target.value))}
-                />
-              </label>
-              <label className="field">
-                <span>Sources per research job</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={100}
-                  required
-                  value={draft.maxSourcesPerAgent}
-                  onChange={(event) => change('maxSourcesPerAgent', Number(event.target.value))}
-                />
-              </label>
-            </div>
-            <label className="field">
-              <span>Research instructions</span>
-              <textarea
-                rows={4}
-                value={draft.instructions}
-                maxLength={20000}
-                onChange={(event) => change('instructions', event.target.value)}
-              />
-            </label>
-            <label className="checkbox-field">
-              <input
-                type="checkbox"
-                checked={draft.requirePrimarySources}
-                onChange={(event) => change('requirePrimarySources', event.target.checked)}
-              />
-              <span>
-                <strong>Require primary sources</strong>
-              </span>
-            </label>
-          </details>
         </section>
         <div className="settings-save">
           <span role="status">

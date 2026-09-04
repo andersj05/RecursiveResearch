@@ -4,25 +4,13 @@
 
 ## Current objective
 
-The simplified RR interface and managed single-turn Codex runtime are implemented, locally verified, and released through `dev` to `main`.
-Future product work should start from `dev` on a focused `feat/<feature>` branch.
-See [progress](progress.md) for verified capabilities and remaining limits.
-
-## Branch state
-
-`feat/project-foundation` records the implementation history, `dev` contains its integration commit, and `main` contains the promoted release.
-The three branches are published to `origin`.
-Remote branch protections have not been installed.
+Implementation and review checks are complete. The owner authorized merging the adaptive harness and project-owned research workflow through `dev` into `main` and pushing both branches. Release promotion is tracked by the repository pull requests.
 
 ## Immediate next actions
 
-- Begin the recursive orchestration design from the latest `dev` when that phase starts.
-
-## Next product phase
-
-Design recursive parent/child jobs, source-level provenance, bounded scheduling, cancellation propagation, and restart checkpoints before implementing multi-agent orchestration.
-Experiments remain deferred.
+- Complete the authorized release promotion and verify remote branch ancestry and CI.
+- Future research-quality work should retain the limitations documented in [verified progress](progress.md).
 
 ## Blockers
 
-None for local development.
+No implementation blocker. Active research is not automatically replayed after restart; saved clarification can continue.

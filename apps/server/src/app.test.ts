@@ -3,7 +3,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { defaultHarnessConfig } from '@recursive-research/contracts';
+import {
+  applicationApiVersion,
+  defaultAdaptiveOptions,
+  defaultHarnessConfig,
+  harnessConfigSchema,
+} from '@recursive-research/contracts';
 import { createApp } from './app.js';
 
 const apps: FastifyInstance[] = [];
@@ -252,5 +257,39 @@ describe('local workspace API', () => {
       threadId: 'thread-test',
       status: 'completed',
     });
+  });
+  it('accepts adaptive research options through the actual HTTP boundary and migrates saved defaults', async () => {
+    const { app, folder } = await fixture(true);
+    expect((await get(app, '/api/health')).json().apiVersion).toBe(applicationApiVersion);
+    const project = (
+      await post(app, '/api/projects', { name: 'Harness regression', folderPath: folder })
+    ).json();
+    const chat = (
+      await post(app, `/api/projects/${project.id}/chats`, { title: 'Research' })
+    ).json();
+    const reply = await post(app, `/api/chats/${chat.id}/runs`, {
+      content: 'Investigate evidence.',
+      mode: 'research',
+      model: 'model-a',
+      reasoningEffort: 'low',
+      harness: defaultAdaptiveOptions,
+    });
+    expect(reply.statusCode).toBe(202);
+    expect(reply.json().harness).toMatchObject({
+      version: 2,
+      maxRounds: defaultAdaptiveOptions.maxRounds,
+    });
+    const legacy = { ...defaultHarnessConfig } as Partial<typeof defaultHarnessConfig>;
+    delete legacy.research;
+    expect(harnessConfigSchema.parse(legacy).research).toEqual(defaultAdaptiveOptions);
+    const settings = {
+      ...defaultHarnessConfig,
+      research: { ...defaultAdaptiveOptions, maxRounds: 4, maxAgents: 2 },
+    };
+    expect(
+      (await app.inject({ method: 'PUT', url: '/api/settings', headers, payload: settings }))
+        .statusCode,
+    ).toBe(200);
+    expect((await get(app, '/api/workspace')).json().settings.research).toEqual(settings.research);
   });
 });

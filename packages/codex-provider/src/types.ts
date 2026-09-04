@@ -1,3 +1,4 @@
+import type { WebToolCall } from '@recursive-research/contracts';
 /** Public metadata only. Codex owns every credential and its refresh lifecycle. */
 export interface CodexAccount {
   type: string;
@@ -76,6 +77,7 @@ export interface CodexTurnInput {
   model: string;
   effort: string;
   mode: 'chat' | 'research';
+  outputSchema?: Record<string, unknown>;
 }
 
 /** Only user-visible messages and public activity cross the provider boundary. */
@@ -84,7 +86,8 @@ export type CodexTurnEvent =
   | { type: 'started'; threadId: string; turnId: string }
   | { type: 'text-delta'; itemId: string; delta: string }
   | { type: 'message'; itemId: string; text: string }
-  | { type: 'progress'; message: string };
+  | { type: 'progress'; message: string }
+  | { type: 'web-tool'; call: WebToolCall };
 
 export interface CodexTurnResult {
   threadId: string;

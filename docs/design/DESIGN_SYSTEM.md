@@ -46,7 +46,7 @@ The conversation view keeps messages central, with Chat or Research mode, model,
 Show live progress only while a job is active; keep Stop and steering close to that job.
 Completed research reports belong with the resulting message and Files surface.
 
-Configuration uses focused sections for the Codex connection, default model and thinking, and advanced harness limits.
+Configuration owns the Codex connection and default model/thinking. Harness owns research defaults and technical reference; it must not launch chats or runs. Project chats are the single research entry point, with Chat/Research selection, per-run limits, execution history, sources, reports, clarification, and active-run controls.
 Account, loading, disconnected, unavailable, and error states must be explicit.
 Never present missing usage as zero or a missing provider as a connected account.
 Separate a form's unsaved draft from persisted configuration.
@@ -70,4 +70,4 @@ Prefer `New project`, `New chat`, `Research`, and `Stop` over clever or technica
 - Keep all actions reachable on narrow screens and do not hide required navigation.
 - Inspect desktop, narrow layouts, keyboard interaction, loading/error states, and reduced motion when changing a shared component.
 
-Product copy should explain research work, not expose adapter protocols, internal package names, implementation status, or decorative technical language.
+Everyday conversation copy should explain research work. The expert harness inspector intentionally exposes actual launch arguments, captured requests, tool parameters, and scheduling algorithms behind labeled disclosure controls. Keep technical details accurate and relevant; do not add decorative implementation language.
