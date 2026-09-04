@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+package-lock.json
+.local
+.recursive-research
+artifacts
+*.tsbuildinfo
