@@ -1,14 +1,14 @@
 import { mkdtemp, mkdir, readFile, writeFile, rename, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { defaultHarnessConfig } from '@recursive-research/contracts';
 import { createApp } from './app.js';
 
 const apps: FastifyInstance[] = [];
 // Retain isolated OS temp fixtures for diagnosis; never use a real project or Codex account.
-async function fixture() {
+async function fixture(connected = false) {
   const root = await mkdtemp(path.join(tmpdir(), 'recursive-research-test-'));
   const folder = path.join(root, 'research');
   await mkdir(folder);
@@ -17,17 +17,40 @@ async function fixture() {
     serveWeb: false,
     provider: {
       getStatus: async () => ({
-        state: 'signed-out' as const,
-        account: null,
+        state: connected ? ('connected' as const) : ('signed-out' as const),
+        account: connected ? { type: 'chatgpt' as const, email: null, planType: null } : null,
         message: null,
         login: null,
       }),
       startLogin: async () => ({ loginId: 'login', authUrl: 'https://auth.openai.com/test' }),
       cancelLogin: async () => {},
-      listModels: async () => [],
+      listModels: async () =>
+        connected
+          ? [
+              {
+                id: 'model-a',
+                model: 'model-a',
+                displayName: 'Model A',
+                description: '',
+                defaultReasoningEffort: 'low',
+                supportedReasoningEfforts: [
+                  { reasoningEffort: 'low', description: '' },
+                  { reasoningEffort: 'high', description: '' },
+                ],
+                isDefault: true,
+              },
+            ]
+          : [],
       getUsage: async () => ({ rateLimits: null, rateLimitsByLimitId: null }),
       subscribe: () => () => {},
       close: async () => {},
+      executeTurn: async () => ({
+        threadId: 'thread-test',
+        turnId: 'turn-test',
+        status: 'completed' as const,
+        text: 'A reply.',
+      }),
+      steerTurn: async () => {},
     },
     folderPicker: async () => folder,
   };
@@ -88,7 +111,7 @@ describe('local workspace API', () => {
       await readFile(path.join(folder, '.recursive-research', 'workspace.json'), 'utf8'),
     );
     expect(disk.messages).toHaveLength(8);
-    expect((await get(restarted, '/api/health')).json().harness.execution).toBe(false);
+    expect((await get(restarted, '/api/health')).json().harness.execution).toBe(true);
   });
 
   it('keeps projects separate and reconnects a moved folder without losing chats', async () => {
@@ -197,5 +220,37 @@ describe('local workspace API', () => {
     expect(artifacts).toMatchObject([{ name: 'sources.md', relativePath: 'sources.md', size: 15 }]);
     expect((await get(app, '/api/codex/status')).json().state).toBe('signed-out');
     expect((await post(app, '/api/codex/login', {})).json().loginId).toBe('login');
+  });
+
+  it('starts a Codex turn with the selected model and returns its durable conversation', async () => {
+    const { app, folder } = await fixture(true);
+    const project = (
+      await post(app, '/api/projects', { name: 'Runtime', folderPath: folder })
+    ).json();
+    const chat = (
+      await post(app, `/api/projects/${project.id}/chats`, { title: 'New chat' })
+    ).json();
+    const started = await post(app, `/api/chats/${chat.id}/runs`, {
+      content: 'Explain this source.',
+      mode: 'chat',
+      model: 'model-a',
+      reasoningEffort: 'high',
+    });
+    expect(started.statusCode).toBe(202);
+    const run = started.json();
+    await vi.waitFor(async () =>
+      expect((await get(app, `/api/runs/${run.id}`)).json().status).toBe('completed'),
+    );
+    const detail = (await get(app, `/api/chats/${chat.id}`)).json();
+    expect(detail.messages.map((message: { content: string }) => message.content)).toEqual([
+      'Explain this source.',
+      'A reply.',
+    ]);
+    expect(detail.runs[0]).toMatchObject({
+      model: 'model-a',
+      reasoningEffort: 'high',
+      threadId: 'thread-test',
+      status: 'completed',
+    });
   });
 });

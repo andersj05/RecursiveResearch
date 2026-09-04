@@ -10,16 +10,26 @@ import {
   createMessageSchema,
   harnessConfigSchema,
   idSchema,
+  startRunSchema,
 } from '@recursive-research/contracts';
 import { CodexProvider, CodexProviderError } from '@recursive-research/codex-provider';
 import { harnessCapabilities } from '@recursive-research/harness';
 import { WorkspaceStore, defaultDataDirectory } from './storage.js';
 import { pickFolder } from './folder-picker.js';
 import { AppError } from './errors.js';
+import { RunCoordinator } from './run-coordinator.js';
 
 type Provider = Pick<
   CodexProvider,
-  'getStatus' | 'startLogin' | 'cancelLogin' | 'listModels' | 'getUsage' | 'subscribe' | 'close'
+  | 'getStatus'
+  | 'startLogin'
+  | 'cancelLogin'
+  | 'listModels'
+  | 'getUsage'
+  | 'subscribe'
+  | 'close'
+  | 'executeTurn'
+  | 'steerTurn'
 >;
 export interface AppOptions {
   dataDirectory?: string;
@@ -50,7 +60,9 @@ export async function createApp(options: AppOptions = {}) {
     '127.0.0.1:5173',
     'localhost:5173',
   ]);
-  const notify = (event: string) => events.emit('change', event);
+  const notify = (event: string, data?: { chatId: string; runId: string }) =>
+    events.emit('change', event, data);
+  const runs = new RunCoordinator(store, provider, notify);
   const unsubscribe = provider.subscribe(() => notify('provider.updated'));
   const streams = new Set<import('node:http').ServerResponse>();
 
@@ -127,7 +139,10 @@ export async function createApp(options: AppOptions = {}) {
     version: '0.1.0',
     harness: harnessCapabilities,
   }));
-  app.get('/api/workspace', async () => store.workspace());
+  app.get('/api/workspace', async () => {
+    await runs.reconcile();
+    return store.workspace();
+  });
   app.post('/api/folders/pick', async () => ({
     folderPath: await (options.folderPicker ?? pickFolder)(),
   }));
@@ -145,7 +160,10 @@ export async function createApp(options: AppOptions = {}) {
     notify('workspace.changed');
     return reply.code(201).send(chat);
   });
-  app.get('/api/chats/:id', async (request) => store.chat(routeId(request.params)));
+  app.get('/api/chats/:id', async (request) => {
+    await runs.reconcile();
+    return store.chat(routeId(request.params));
+  });
   app.post('/api/chats/:id/messages', async (request, reply) => {
     const message = await store.addMessage(
       routeId(request.params),
@@ -154,9 +172,32 @@ export async function createApp(options: AppOptions = {}) {
     notify('workspace.changed');
     return reply.code(201).send(message);
   });
+  app.post('/api/chats/:id/runs', async (request, reply) => {
+    const run = await runs.start(routeId(request.params), startRunSchema.parse(request.body));
+    return reply.code(202).send(run);
+  });
+  app.get('/api/runs/:id', async (request) => {
+    await runs.reconcile();
+    return store.run(routeId(request.params));
+  });
+  app.post('/api/runs/:id/cancel', async (request, reply) => {
+    const run = await runs.cancel(routeId(request.params));
+    return reply.code(202).send(run);
+  });
+  app.post('/api/runs/:id/steer', async (request) =>
+    runs.steer(routeId(request.params), createMessageSchema.parse(request.body).content),
+  );
   app.get('/api/projects/:id/artifacts', async (request) =>
     store.artifacts(routeId(request.params)),
   );
+  app.get('/api/projects/:id/artifact', async (request, reply) => {
+    const { path } = z
+      .object({ path: z.string().min(1).max(4000) })
+      .strict()
+      .parse(request.query);
+    const content = await store.readArtifact(routeId(request.params), path);
+    return reply.type('text/plain; charset=utf-8').send(content);
+  });
   app.put('/api/settings', async (request) => {
     const settings = await store.saveSettings(harnessConfigSchema.parse(request.body));
     notify('workspace.changed');
@@ -184,9 +225,9 @@ export async function createApp(options: AppOptions = {}) {
       'X-Accel-Buffering': 'no',
     });
     streams.add(reply.raw);
-    const send = (event: string) => {
+    const send = (event: string, data: unknown = {}) => {
       // Slow tabs reconnect and reload durable state instead of buffering forever.
-      if (!reply.raw.write(`event: ${event}\ndata: {}\n\n`)) reply.raw.end();
+      if (!reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)) reply.raw.end();
     };
     send('connected');
     events.on('change', send);
@@ -213,7 +254,7 @@ export async function createApp(options: AppOptions = {}) {
   });
   app.addHook('onClose', async () => {
     unsubscribe();
-    await provider.close();
+    await runs.close();
     events.removeAllListeners();
   });
   return app;

@@ -162,6 +162,7 @@ describe('durable chat and research runs', () => {
     } finally {
       await Promise.all(
         children.map(async (child) => {
+          if (child.exitCode !== null || child.signalCode !== null) return;
           const exited = once(child, 'exit');
           if (child.connected) child.send('exit');
           else child.kill();
