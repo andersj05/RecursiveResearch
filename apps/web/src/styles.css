@@ -2905,3 +2905,19 @@ h3 {
     flex-basis: 100%;
   }
 }
+
+@media (max-width: 600px) {
+  .workspace-tabs {
+    flex-wrap: wrap;
+    column-gap: 12px;
+    row-gap: 0;
+  }
+  .run-progress {
+    flex-wrap: wrap;
+  }
+  .run-progress > span:nth-child(2) {
+    flex-basis: calc(100% - 25px);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}

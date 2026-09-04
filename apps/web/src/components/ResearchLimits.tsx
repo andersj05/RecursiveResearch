@@ -28,6 +28,7 @@ export function ResearchLimits({
             step={1}
             value={value[key]}
             required
+            onInvalid={(event) => event.currentTarget.closest('details')?.setAttribute('open', '')}
             disabled={disabled}
             onChange={(event) => onChange({ ...value, [key]: Number(event.target.value) })}
           />

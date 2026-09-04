@@ -72,7 +72,7 @@ export function ProjectResearch({ detail }: { detail: ChatDetail }) {
         {(['run', 'sources', 'report'] as const).map((id) => (
           <button type="button" key={id} aria-pressed={view === id} onClick={() => setView(id)}>
             {id === 'run'
-              ? 'Live run'
+              ? 'Execution'
               : id === 'sources'
                 ? `Sources (${state?.sources.length ?? 0})`
                 : 'Report'}
