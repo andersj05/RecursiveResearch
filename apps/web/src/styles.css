@@ -2740,3 +2740,168 @@ h3 {
     margin: 8px 0 0;
   }
 }
+/* Harness settings stay global; execution and results stay with their project chat. */
+.harness-defaults {
+  margin: 24px 0 32px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.settings-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.settings-section-heading h2 {
+  margin: 0;
+  font: 14px var(--mono);
+}
+.settings-section-heading > span {
+  color: var(--muted);
+  font: 11px var(--mono);
+}
+.research-limit-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.research-limit-fields .field {
+  margin: 0;
+}
+.research-limit-fields input {
+  width: 100%;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--panel);
+  padding: 10px;
+}
+.harness-defaults .expert-details {
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+}
+.harness-policy-fields {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  margin-top: 20px;
+}
+.harness-policy-fields > .field {
+  max-width: 230px;
+}
+.harness-page .harness-policy-fields .checkbox-field {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+.harness-defaults-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+  margin-top: 20px;
+}
+.harness-defaults-footer > span {
+  flex: 1;
+  color: var(--muted);
+  font: 11px var(--mono);
+}
+.chat-research-options {
+  border-top: 1px solid var(--line);
+  padding: 0 18px;
+}
+.chat-research-options > summary,
+.research-brief-details > summary {
+  cursor: pointer;
+  font: 11px var(--mono);
+  padding: 14px 0;
+}
+.chat-research-options .field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font: 11px var(--mono);
+}
+.chat-research-budget {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+  font: 10px var(--mono);
+  color: var(--muted);
+}
+.project-research {
+  padding: 22px 0;
+  min-width: 0;
+}
+.project-research-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.project-research-heading h2 {
+  margin: 0 0 8px;
+  font: 14px var(--mono);
+}
+.research-run-meta {
+  color: var(--muted);
+  font: 10px var(--mono);
+}
+.project-research-heading > label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  font: 10px var(--mono);
+}
+.project-research-heading select {
+  width: 320px;
+  max-width: 100%;
+  padding: 9px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--panel);
+}
+.research-brief-details {
+  border-bottom: 1px solid var(--line);
+  margin-top: 12px;
+}
+.research-brief-details p {
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.project-research .harness-detail-tabs {
+  margin-top: 12px;
+}
+@media (max-width: 700px) {
+  .research-limit-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .harness-defaults {
+    padding: 18px;
+  }
+  .settings-section-heading,
+  .harness-policy-fields,
+  .project-research-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .project-research-heading > label,
+  .project-research-heading select {
+    width: 100%;
+  }
+  .harness-defaults-footer {
+    flex-wrap: wrap;
+  }
+  .harness-defaults-footer > span {
+    flex-basis: 100%;
+  }
+}

@@ -349,15 +349,11 @@ export function App() {
             <Configuration settings={workspace.settings} onSaved={() => void refresh()} />
           ) : view === 'harness' ? (
             <HarnessPage
-              workspace={workspace}
-              revision={revision}
-              initialProjectId={projectId}
+              settings={workspace.settings}
               onSaved={() => {
                 void refresh();
                 setRevision((current) => current + 1);
               }}
-              onConfigure={configure}
-              onCreateProject={() => setShowProjectDialog(true)}
             />
           ) : project ? (
             <ResearchWorkspace
