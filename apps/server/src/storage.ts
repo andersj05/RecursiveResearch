@@ -104,6 +104,13 @@ function recoverAbandonedRuns(document: ProjectDocument): number {
   for (const run of document.runs) {
     if (!activeRun(run) || run.status === 'waiting' || !ownerIsDead(run)) continue;
     const timestamp = now();
+    if (run.harness?.version === 2)
+      for (const task of run.harness.orchestration.tasks) {
+        if (['pending', 'queued', 'running'].includes(task.status)) {
+          task.status = 'interrupted';
+          task.completedAt = now();
+        }
+      }
     run.status = 'interrupted';
     run.error = 'The server stopped before this run finished. Send a new message to continue.';
     run.updatedAt = timestamp;

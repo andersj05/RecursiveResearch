@@ -169,6 +169,16 @@ export const adaptiveOptionsSchema = z
   })
   .strict();
 export type AdaptiveOptions = z.infer<typeof adaptiveOptionsSchema>;
+export const harnessRuntimeSchema = z.object({
+  provider: z.enum(['codex', 'injected']),
+  launch: z
+    .object({ executable: z.string(), args: z.array(z.string()), shell: z.literal(false) })
+    .nullable(),
+  transport: z.string(),
+  scheduler: z.object({ active: z.number(), queued: z.number(), limit: z.number() }),
+  methods: z.array(z.string()),
+});
+export type HarnessRuntime = z.infer<typeof harnessRuntimeSchema>;
 export const defaultAdaptiveOptions: AdaptiveOptions = {
   strategy: 'adaptive',
   maxRounds: 6,

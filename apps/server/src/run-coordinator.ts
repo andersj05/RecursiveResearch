@@ -12,8 +12,11 @@ import {
   stageInstructions,
   stagePrompt,
   buildTurnInstructions,
+  createAdaptiveState,
 } from '@recursive-research/harness';
 import { WorkspaceStore } from './storage.js';
+import { AdaptiveResearch } from './adaptive-research.js';
+import { TurnPool } from './turn-pool.js';
 import { AppError } from './errors.js';
 
 export type ExecutionProvider = Pick<
@@ -24,6 +27,7 @@ type RunPatch = Parameters<WorkspaceStore['updateRun']>[1];
 type Notify = (event: string, data?: { chatId: string; runId: string }) => void;
 interface Worker {
   run: Run;
+  adaptive?: AdaptiveResearch;
   controller: AbortController;
   parts: Map<string, string>;
   text: string;
@@ -51,6 +55,10 @@ export class RunCoordinator {
   private reconciling: Promise<void> | null = null;
   private readonly startingChats = new Set<string>();
   private closing = false;
+  private readonly pool = new TurnPool();
+  runtime() {
+    return this.pool.status;
+  }
   constructor(
     private readonly store: WorkspaceStore,
     private readonly provider: ExecutionProvider,
@@ -75,6 +83,7 @@ export class RunCoordinator {
     if (this.closing)
       throw new AppError(503, 'SERVER_STOPPING', 'The app is restarting. Try again shortly.');
     const { settings } = await this.store.workspace();
+    this.pool.limit = settings.maxParallelAgents;
     if (
       this.startingChats.has(chatId) ||
       [...this.active.values()].some((worker) => worker.run.chatId === chatId)
@@ -121,24 +130,27 @@ export class RunCoordinator {
       this.validateEffort(model, effort);
       if (this.closing)
         throw new AppError(503, 'SERVER_STOPPING', 'The app is restarting. Try again shortly.');
-      const harness: HarnessState | null = input.harness
-        ? {
-            version: 1,
-            stage: 'scope',
-            brief: input.content,
-            ...input.harness,
-            requirePrimarySources: settings.requirePrimarySources,
-            instructions: settings.instructions,
-            round: 0,
-            question: null,
-            answer: null,
-            plan: [],
-            sources: [],
-            gaps: [],
-            steps: [],
-            stopReason: null,
-          }
-        : null;
+      const harness: HarnessState | null =
+        input.harness && 'strategy' in input.harness
+          ? createAdaptiveState(input.content, input.harness, settings)
+          : input.harness
+            ? {
+                version: 1,
+                stage: 'scope',
+                brief: input.content,
+                ...input.harness,
+                requirePrimarySources: settings.requirePrimarySources,
+                instructions: settings.instructions,
+                round: 0,
+                question: null,
+                answer: null,
+                plan: [],
+                sources: [],
+                gaps: [],
+                steps: [],
+                stopReason: null,
+              }
+            : null;
       const run = await this.store.createRun(chatId, {
         ...input,
         model: model.model,
@@ -248,20 +260,61 @@ export class RunCoordinator {
     worker: Worker,
     input: Parameters<CodexProvider['executeTurn']>[0],
   ): Promise<void> {
-    const timeout = setTimeout(() => {
-      worker.timedOut = true;
-      worker.controller.abort();
-    }, this.timeoutMs[input.mode]);
+    const timeout = setTimeout(
+      () => {
+        worker.timedOut = true;
+        worker.controller.abort();
+      },
+      worker.run.harness?.version === 2
+        ? Math.max(
+            1,
+            worker.run.harness.orchestration.maxMinutes * 60000 -
+              worker.run.harness.orchestration.elapsedMs,
+          )
+        : this.timeoutMs[input.mode],
+    );
     timeout.unref();
     try {
+      if (worker.run.harness?.version === 2) {
+        const adaptive = new AdaptiveResearch(
+          worker.run.harness,
+          this.provider,
+          this.pool,
+          input,
+          worker.controller,
+          async (state, summary) => {
+            this.enqueue(worker, { status: 'running', harness: state, summary });
+            await worker.queue;
+            if (worker.failure) throw worker.failure;
+          },
+          (event) => this.event(worker, event),
+        );
+        worker.adaptive = adaptive;
+        const result = await adaptive.run();
+        worker.finishing = true;
+        if (worker.flushTimer) clearTimeout(worker.flushTimer);
+        await worker.queue;
+        if (worker.failure) throw worker.failure;
+        worker.controller.signal.throwIfAborted();
+        worker.text = result.text;
+        await this.persistTerminal(worker, {
+          status: result.status,
+          content: result.text,
+          harness: adaptive.state,
+          turnId: null,
+        });
+        return;
+      }
       if (worker.run.harness) {
         await this.executeHarness(worker, input);
         return;
       }
-      const result = await this.provider.executeTurn(
-        input,
-        (event) => this.event(worker, event),
-        worker.controller.signal,
+      const result = await this.pool.run(worker.controller.signal, () =>
+        this.provider.executeTurn(
+          input,
+          (event) => this.event(worker, event),
+          worker.controller.signal,
+        ),
       );
       worker.finishing = true;
       if (worker.flushTimer) clearTimeout(worker.flushTimer);
@@ -294,6 +347,7 @@ export class RunCoordinator {
       await this.persistTerminal(worker, {
         status: worker.shutdown ? 'interrupted' : cancelled ? 'cancelled' : 'failed',
         content: worker.text,
+        ...(worker.adaptive ? { harness: worker.adaptive.state } : {}),
         error: worker.shutdown
           ? 'The app stopped before this response finished.'
           : cancelled
@@ -314,7 +368,9 @@ export class RunCoordinator {
     worker: Worker,
     input: Parameters<CodexProvider['executeTurn']>[0],
   ): Promise<void> {
-    let state = worker.run.harness!;
+    if (worker.run.harness?.version !== 1)
+      throw new AppError(400, 'UNSUPPORTED_HARNESS', 'Unsupported research workflow.');
+    let state = worker.run.harness;
     while (true) {
       worker.controller.signal.throwIfAborted();
       if (state.stage === 'gather') state = { ...state, round: state.round + 1 };
@@ -329,23 +385,25 @@ export class RunCoordinator {
       worker.controller.signal.throwIfAborted();
       const report = state.stage === 'report';
       worker.parts.clear();
-      const result = await this.provider.executeTurn(
-        {
-          ...input,
-          // Each stage receives bounded, validated context, never a prior raw provider transcript.
-          threadId: undefined,
-          mode: state.stage === 'gather' ? 'research' : 'chat',
-          prompt: stagePrompt(state),
-          instructions: stageInstructions(state),
-          outputSchema: report
-            ? undefined
-            : stageOutputSchema(state.stage as Exclude<HarnessState['stage'], 'report'>),
-        },
-        (event) => {
-          if (report || (event.type !== 'message' && event.type !== 'text-delta'))
-            this.event(worker, event);
-        },
-        worker.controller.signal,
+      const result = await this.pool.run(worker.controller.signal, () =>
+        this.provider.executeTurn(
+          {
+            ...input,
+            // Each stage receives bounded, validated context, never a prior raw provider transcript.
+            threadId: undefined,
+            mode: state.stage === 'gather' ? 'research' : 'chat',
+            prompt: stagePrompt(state),
+            instructions: stageInstructions(state),
+            outputSchema: report
+              ? undefined
+              : stageOutputSchema(state.stage as Exclude<HarnessState['stage'], 'report'>),
+          },
+          (event) => {
+            if (report || (event.type !== 'message' && event.type !== 'text-delta'))
+              this.event(worker, event);
+          },
+          worker.controller.signal,
+        ),
       );
       if (worker.flushTimer) {
         clearTimeout(worker.flushTimer);
@@ -430,6 +488,7 @@ export class RunCoordinator {
     const finishing = this.active.get(id);
     if (finishing?.finishing) await finishing.done;
     const { settings } = await this.store.workspace();
+    this.pool.limit = settings.maxParallelAgents;
     if (this.startingChats.has(run.chatId) || this.active.has(id))
       throw new AppError(409, 'CHAT_BUSY', 'Research is already continuing.');
     if (this.active.size + this.startingChats.size >= settings.maxParallelAgents)
@@ -519,6 +578,12 @@ export class RunCoordinator {
   async steer(id: string, content: string): Promise<Run> {
     const run = await this.store.run(id);
     const worker = this.active.get(id);
+    if (worker?.adaptive && isActiveRun(run) && !worker.finishing) {
+      await worker.adaptive.steer(content);
+      await this.store.addMessage(run.chatId, content);
+      this.notify('workspace.changed');
+      return this.store.run(id);
+    }
     if (
       !worker ||
       !isActiveRun(run) ||

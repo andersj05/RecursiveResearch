@@ -12,7 +12,11 @@ import {
   idSchema,
   startRunSchema,
 } from '@recursive-research/contracts';
-import { CodexProvider, CodexProviderError } from '@recursive-research/codex-provider';
+import {
+  CodexProvider,
+  CodexProviderError,
+  codexLaunchCommand,
+} from '@recursive-research/codex-provider';
 import { harnessCapabilities } from '@recursive-research/harness';
 import { WorkspaceStore, defaultDataDirectory } from './storage.js';
 import { pickFolder } from './folder-picker.js';
@@ -138,6 +142,15 @@ export async function createApp(options: AppOptions = {}) {
     status: 'ok',
     version: '0.1.0',
     harness: harnessCapabilities,
+  }));
+  app.get('/api/harness/runtime', async () => ({
+    provider: options.provider ? 'injected' : 'codex',
+    launch: options.provider
+      ? null
+      : codexLaunchCommand({ executable: process.env.CODEX_EXECUTABLE }),
+    transport: 'JSON-RPC over stdio',
+    scheduler: runs.runtime(),
+    methods: ['thread/start', 'turn/start', 'turn/steer', 'turn/interrupt'],
   }));
   app.get('/api/workspace', async () => {
     await runs.reconcile();

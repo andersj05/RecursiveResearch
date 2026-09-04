@@ -7,7 +7,11 @@ import {
   type CodexTurnEvent,
   type CodexTurnInput,
 } from '@recursive-research/codex-provider';
-import { defaultHarnessConfig, type StartRunInput } from '@recursive-research/contracts';
+import {
+  defaultHarnessConfig,
+  defaultAdaptiveOptions,
+  type StartRunInput,
+} from '@recursive-research/contracts';
 import { WorkspaceStore } from './storage.js';
 import { RunCoordinator, type ExecutionProvider } from './run-coordinator.js';
 
@@ -410,5 +414,177 @@ describe('sequential research harness', () => {
     expect(provider.executeTurn).toHaveBeenCalledTimes(3);
     expect((await store.run(run.id)).harness?.stage).toBe('gather');
     expect((await store.run(run.id)).reportPath).toBeNull();
+  });
+});
+
+describe('adaptive delegated research coordination', () => {
+  const adaptiveInput: StartRunInput = {
+    ...input,
+    mode: 'research',
+    harness: { ...defaultAdaptiveOptions, maxRounds: 2, maxTasks: 6, maxSources: 8, maxAgents: 2 },
+  };
+  const direction = (question: string) => ({
+    question,
+    reason: 'Resolve evidence gap',
+    priority: 4,
+    role: 'researcher',
+    parentId: null,
+  });
+  const source = (name: string) => ({
+    url: `https://example.com/${name}`,
+    title: name,
+    finding: `Evidence for ${name}`,
+    primary: true,
+  });
+  it('delegates concurrent branches, evolves the frontier, records tools, and writes a concise report', async () => {
+    let active = 0;
+    let peak = 0;
+    let investigations = 0;
+    let reviews = 0;
+    let release!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const { coordinator, store, chat, provider } = await fixture(async (turn, emit) => {
+      const context = JSON.parse(turn.prompt);
+      const task = context.assignment;
+      emit({ type: 'started', threadId: task.id, turnId: task.id });
+      let output: unknown;
+      if (task.role === 'planner')
+        output = {
+          summary: 'Research plan',
+          question: null,
+          directions: [direction('A'), direction('B')],
+        };
+      else if (task.role === 'synthesizer')
+        output = {
+          summary: 'Working synthesis',
+          sufficient: ++reviews === 2,
+          gaps: reviews === 1 ? ['Follow C'] : [],
+          contradictions: [],
+          directions: [],
+        };
+      else if (task.role === 'reporter')
+        output = '# Findings\nA concise answer with [evidence](https://example.com/A).';
+      else {
+        active++;
+        peak = Math.max(peak, active);
+        investigations++;
+        if (investigations === 2) release();
+        emit({
+          type: 'web-tool',
+          call: { itemId: 'search', action: 'search', status: 'started', query: task.question },
+        });
+        await barrier;
+        emit({
+          type: 'web-tool',
+          call: { itemId: 'search', action: 'search', status: 'completed', query: task.question },
+        });
+        output = {
+          summary: `Finding ${task.question}`,
+          sources: [source(task.question)],
+          leads: task.question === 'A' ? [direction('C')] : [],
+          uncertainties: [],
+        };
+        active--;
+      }
+      return {
+        threadId: task.id,
+        turnId: task.id,
+        status: 'completed',
+        text: typeof output === 'string' ? output : JSON.stringify(output),
+      };
+    });
+    const run = await coordinator.start(chat.id, adaptiveInput);
+    await vi.waitFor(async () => expect((await store.run(run.id)).status).toBe('completed'), {
+      timeout: 8000,
+    });
+    const saved = await store.run(run.id);
+    expect(saved.harness?.version).toBe(2);
+    if (saved.harness?.version !== 2) throw new Error('Expected adaptive state');
+    expect(peak).toBe(2);
+    expect(investigations).toBe(3);
+    const tasks = saved.harness.orchestration.tasks;
+    expect(tasks.find((t) => t.question === 'C')?.parentId).toBe(
+      tasks.find((t) => t.question === 'A')?.id,
+    );
+    expect(saved.harness.sources).toHaveLength(3);
+    expect(saved.harness.orchestration.toolCalls).toHaveLength(3);
+    expect(saved.harness.orchestration.toolCalls.every((t) => t.status === 'completed')).toBe(true);
+    expect(provider.executeTurn).toHaveBeenCalledTimes(7);
+    expect(saved.reportPath).toBeTruthy();
+    expect((await store.chat(chat.id)).messages.at(-1)?.content).not.toContain('Working synthesis');
+  });
+  it('cancels every active child and launches no synthesis after Stop', async () => {
+    let running = 0;
+    const { coordinator, store, chat, provider } = await fixture(async (turn, emit, signal) => {
+      const task = JSON.parse(turn.prompt).assignment;
+      if (task.role === 'planner')
+        return {
+          threadId: 'planner',
+          turnId: 'planner',
+          status: 'completed',
+          text: JSON.stringify({
+            summary: 'Plan',
+            question: null,
+            directions: [direction('A'), direction('B')],
+          }),
+        };
+      running++;
+      try {
+        return await heldTurn(turn, emit, signal);
+      } finally {
+        running--;
+      }
+    });
+    const run = await coordinator.start(chat.id, adaptiveInput);
+    await vi.waitFor(() => expect(running).toBe(2), { timeout: 5000 });
+    await coordinator.cancel(run.id);
+    await vi.waitFor(async () => expect((await store.run(run.id)).status).toBe('cancelled'));
+    expect(running).toBe(0);
+    expect(provider.executeTurn).toHaveBeenCalledTimes(3);
+    const saved = (await store.run(run.id)).harness;
+    if (saved?.version !== 2) throw new Error('Expected adaptive state');
+    expect(
+      saved.orchestration.tasks
+        .filter((t) => t.role === 'researcher')
+        .every((t) => t.status === 'cancelled'),
+    ).toBe(true);
+  });
+  it('continues with partial evidence when one research agent returns invalid output', async () => {
+    const { coordinator, store, chat } = await fixture(async (turn) => {
+      const task = JSON.parse(turn.prompt).assignment;
+      const output =
+        task.role === 'planner'
+          ? { summary: 'Plan', question: null, directions: [direction('A'), direction('B')] }
+          : task.role === 'synthesizer'
+            ? {
+                summary: 'Partial result',
+                sufficient: false,
+                gaps: ['B failed'],
+                contradictions: [],
+                directions: [],
+              }
+            : task.role === 'reporter'
+              ? 'Partial findings; one branch failed.'
+              : task.question === 'A'
+                ? { summary: 'A found', sources: [source('A')], leads: [], uncertainties: [] }
+                : 'not JSON';
+      return {
+        threadId: task.id,
+        turnId: task.id,
+        status: 'completed',
+        text: typeof output === 'string' ? output : JSON.stringify(output),
+      };
+    });
+    const run = await coordinator.start(chat.id, adaptiveInput);
+    await vi.waitFor(async () => expect((await store.run(run.id)).status).toBe('completed'), {
+      timeout: 5000,
+    });
+    const saved = (await store.run(run.id)).harness;
+    if (saved?.version !== 2) throw new Error('Expected adaptive state');
+    expect(saved.sources).toHaveLength(1);
+    expect(saved.orchestration.tasks.find((t) => t.question === 'B')?.status).toBe('failed');
+    expect(saved.gaps).toEqual(['B failed']);
   });
 });
