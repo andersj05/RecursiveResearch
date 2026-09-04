@@ -1,7 +1,18 @@
 import type { CodexModel, CodexTurnEvent, CodexProvider } from '@recursive-research/codex-provider';
 import { CodexProviderError } from '@recursive-research/codex-provider';
-import { isActiveRun, type Run, type StartRunInput } from '@recursive-research/contracts';
-import { buildTurnInstructions } from '@recursive-research/harness';
+import {
+  isActiveRun,
+  stageOutputSchema,
+  type HarnessState,
+  type Run,
+  type StartRunInput,
+} from '@recursive-research/contracts';
+import {
+  advanceHarness,
+  stageInstructions,
+  stagePrompt,
+  buildTurnInstructions,
+} from '@recursive-research/harness';
 import { WorkspaceStore } from './storage.js';
 import { AppError } from './errors.js';
 
@@ -48,6 +59,8 @@ export class RunCoordinator {
   ) {}
 
   async start(chatId: string, input: StartRunInput): Promise<Run> {
+    if (input.harness && input.mode !== 'research')
+      throw new AppError(400, 'INVALID_MODE', 'The harness requires Research mode.');
     await this.reconcile();
     if ([...this.pendingWrites.values()].some(({ worker }) => worker.run.chatId === chatId))
       throw new AppError(
@@ -108,10 +121,29 @@ export class RunCoordinator {
       this.validateEffort(model, effort);
       if (this.closing)
         throw new AppError(503, 'SERVER_STOPPING', 'The app is restarting. Try again shortly.');
+      const harness: HarnessState | null = input.harness
+        ? {
+            version: 1,
+            stage: 'scope',
+            brief: input.content,
+            ...input.harness,
+            requirePrimarySources: settings.requirePrimarySources,
+            instructions: settings.instructions,
+            round: 0,
+            question: null,
+            answer: null,
+            plan: [],
+            sources: [],
+            gaps: [],
+            steps: [],
+            stopReason: null,
+          }
+        : null;
       const run = await this.store.createRun(chatId, {
         ...input,
         model: model.model,
         reasoningEffort: effort,
+        harnessState: harness,
       });
       const worker: Worker = {
         run,
@@ -222,6 +254,10 @@ export class RunCoordinator {
     }, this.timeoutMs[input.mode]);
     timeout.unref();
     try {
+      if (worker.run.harness) {
+        await this.executeHarness(worker, input);
+        return;
+      }
       const result = await this.provider.executeTurn(
         input,
         (event) => this.event(worker, event),
@@ -274,8 +310,181 @@ export class RunCoordinator {
     }
   }
 
+  private async executeHarness(
+    worker: Worker,
+    input: Parameters<CodexProvider['executeTurn']>[0],
+  ): Promise<void> {
+    let state = worker.run.harness!;
+    while (true) {
+      worker.controller.signal.throwIfAborted();
+      if (state.stage === 'gather') state = { ...state, round: state.round + 1 };
+      this.enqueue(worker, {
+        status: 'running',
+        turnId: null,
+        harness: state,
+        summary: `${state.stage === 'gather' ? `Gather � round ${state.round}` : state.stage.charAt(0).toUpperCase() + state.stage.slice(1)} started.`,
+      });
+      await worker.queue;
+      if (worker.failure) throw worker.failure;
+      worker.controller.signal.throwIfAborted();
+      const report = state.stage === 'report';
+      worker.parts.clear();
+      const result = await this.provider.executeTurn(
+        {
+          ...input,
+          // Each stage receives bounded, validated context, never a prior raw provider transcript.
+          threadId: undefined,
+          mode: state.stage === 'gather' ? 'research' : 'chat',
+          prompt: stagePrompt(state),
+          instructions: stageInstructions(state),
+          outputSchema: report
+            ? undefined
+            : stageOutputSchema(state.stage as Exclude<HarnessState['stage'], 'report'>),
+        },
+        (event) => {
+          if (report || (event.type !== 'message' && event.type !== 'text-delta'))
+            this.event(worker, event);
+        },
+        worker.controller.signal,
+      );
+      if (worker.flushTimer) {
+        clearTimeout(worker.flushTimer);
+        worker.flushTimer = undefined;
+      }
+      await worker.queue;
+      if (worker.failure) throw worker.failure;
+      worker.controller.signal.throwIfAborted();
+      if (result.status !== 'completed')
+        throw new CodexProviderError('TURN_CANCELLED', 'The research stage was interrupted.');
+      if (report) {
+        if (result.text.length > 200000)
+          throw new AppError(
+            413,
+            'RESPONSE_TOO_LARGE',
+            'The report exceeded the saved-message limit.',
+          );
+        state = {
+          ...state,
+          steps: [
+            ...state.steps,
+            {
+              stage: 'report',
+              round: state.round,
+              summary: 'Research report saved.',
+              completedAt: new Date().toISOString(),
+            },
+          ],
+        };
+        worker.finishing = true;
+        worker.text = result.text;
+        await this.persistTerminal(worker, {
+          status: 'completed',
+          content: result.text,
+          harness: state,
+        });
+        return;
+      }
+      try {
+        state = advanceHarness(state, result.text, new Date().toISOString());
+      } catch {
+        throw new AppError(
+          502,
+          'INVALID_STAGE_OUTPUT',
+          'The research stage returned an invalid result. Its last valid checkpoint is saved; start a new research run to retry.',
+        );
+      }
+      worker.text = state.steps
+        .map(
+          (step) =>
+            `### ${step.stage.charAt(0).toUpperCase() + step.stage.slice(1)}${step.round ? ` � round ${step.round}` : ''}\n\n${step.summary}`,
+        )
+        .join('\n\n');
+      if (state.stage === 'scope' && state.question) {
+        worker.finishing = true;
+        worker.text += `\n\n**Question:** ${state.question}`;
+        await this.persistTerminal(worker, {
+          status: 'waiting',
+          harness: state,
+          content: worker.text,
+          turnId: null,
+          summary: 'Waiting for your clarification.',
+        });
+        return;
+      }
+      this.enqueue(worker, {
+        harness: state,
+        content: worker.text,
+        turnId: null,
+        summary: state.steps.at(-1)!.summary.slice(0, 500),
+      });
+      await worker.queue;
+      if (worker.failure) throw worker.failure;
+    }
+  }
+
+  async answer(id: string, content: string): Promise<Run> {
+    await this.reconcile();
+    const run = await this.store.run(id);
+    if (this.closing)
+      throw new AppError(503, 'SERVER_STOPPING', 'The app is restarting. Try again shortly.');
+    const finishing = this.active.get(id);
+    if (finishing?.finishing) await finishing.done;
+    const { settings } = await this.store.workspace();
+    if (this.startingChats.has(run.chatId) || this.active.has(id))
+      throw new AppError(409, 'CHAT_BUSY', 'Research is already continuing.');
+    if (this.active.size + this.startingChats.size >= settings.maxParallelAgents)
+      throw new AppError(409, 'RUN_LIMIT', 'Wait for an active job to finish before continuing.');
+    this.startingChats.add(run.chatId);
+    try {
+      const context = await this.store.getRunContext(run.chatId);
+      if ((await this.provider.getStatus()).state !== 'connected')
+        throw new AppError(409, 'CODEX_CONNECTION_REQUIRED', 'Connect Codex to continue research.');
+      const model = (await this.provider.listModels()).find((item) => item.model === run.model);
+      if (!model)
+        throw new AppError(
+          400,
+          'MODEL_UNAVAILABLE',
+          'The original model is unavailable. Stop this run and start a new one with an available model.',
+        );
+      this.validateEffort(model, run.reasoningEffort);
+      if (this.closing)
+        throw new AppError(503, 'SERVER_STOPPING', 'The app is restarting. Try again shortly.');
+      const claimed = await this.store.answerHarness(id, content);
+      const worker: Worker = {
+        run: claimed,
+        controller: new AbortController(),
+        parts: new Map(),
+        text: context.messages.find((item) => item.id === run.assistantMessageId)?.content ?? '',
+        queue: Promise.resolve(),
+        done: Promise.resolve(),
+        timedOut: false,
+        stopping: false,
+        shutdown: false,
+        finishing: false,
+        lastProgress: '',
+      };
+      this.active.set(id, worker);
+      worker.done = this.execute(worker, {
+        cwd: context.project.folderPath,
+        prompt: '',
+        instructions: '',
+        model: claimed.model,
+        effort: claimed.reasoningEffort,
+        mode: 'research',
+      });
+      this.notify('workspace.changed');
+      return claimed;
+    } finally {
+      this.startingChats.delete(run.chatId);
+    }
+  }
+
   async cancel(id: string): Promise<Run> {
     const knownWorker = this.active.get(id);
+    if (knownWorker?.finishing) {
+      await knownWorker.done;
+      return this.cancel(id);
+    }
     if (knownWorker) {
       // Stop must work even while the chosen project drive is disconnected.
       knownWorker.stopping = true;
@@ -288,6 +497,11 @@ export class RunCoordinator {
     }
     await this.reconcile();
     const run = await this.store.run(id);
+    if (run.status === 'waiting') {
+      const cancelled = await this.store.cancelWaitingHarness(id);
+      this.notify('workspace.changed');
+      return cancelled;
+    }
     if (!isActiveRun(run)) return run;
     const worker = this.active.get(id);
     if (!worker)

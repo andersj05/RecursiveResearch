@@ -260,3 +260,127 @@ describe('Codex run coordination', () => {
     await vi.waitFor(async () => expect((await store.run(run.id)).status).toBe('cancelled'));
   });
 });
+
+describe('sequential research harness', () => {
+  const research = {
+    ...input,
+    mode: 'research' as const,
+    harness: { maxRounds: 2, maxSources: 3 },
+  };
+  function scripted(outputs: unknown[]): Execute {
+    let index = 0;
+    return async (_input, emit) => {
+      const turn = `stage-${index}`;
+      emit({ type: 'started', threadId: turn, turnId: turn });
+      const output = outputs[index++];
+      const text = typeof output === 'string' ? output : JSON.stringify(output);
+      emit({ type: 'message', itemId: turn, text });
+      return { threadId: turn, turnId: turn, status: 'completed', text };
+    };
+  }
+  const source = {
+    url: 'https://example.com/research',
+    title: 'Primary source',
+    finding: 'A supported finding',
+    primary: true,
+  };
+  it('executes the graph, limits search to gathering and publishes a report', async () => {
+    const { coordinator, store, chat, project, provider } = await fixture(
+      scripted([
+        { summary: 'Clear scope', question: null },
+        { questions: ['What is known?'] },
+        { summary: 'Evidence found', sources: [source] },
+        { summary: 'Coverage complete', gaps: [] },
+        '# Research report\n\nA finding [Source](https://example.com/research).',
+      ]),
+    );
+    const run = await coordinator.start(chat.id, research);
+    await vi.waitFor(async () => expect((await store.run(run.id)).status).toBe('completed'), {
+      timeout: 5000,
+    });
+    const saved = await store.run(run.id);
+    expect(saved.harness?.steps.map((step) => step.stage)).toEqual([
+      'scope',
+      'plan',
+      'gather',
+      'review',
+      'report',
+    ]);
+    expect(saved.harness?.sources).toHaveLength(1);
+    expect(saved.harness?.stopReason).toContain('no remaining');
+    expect(await store.readArtifact(project.id, saved.reportPath!)).toContain('# Research report');
+    const calls = vi.mocked(provider.executeTurn).mock.calls;
+    expect(calls.map(([turn]) => turn.mode)).toEqual(['chat', 'chat', 'research', 'chat', 'chat']);
+    expect(calls.every(([turn]) => turn.threadId === undefined)).toBe(true);
+    expect((await store.chat(chat.id)).chat.codexThreadId).toBeNull();
+  });
+  it('persists clarification, releases capacity, continues after coordinator restart, and rejects duplicate answers', async () => {
+    const { coordinator, store, chat, provider, notify } = await fixture(
+      scripted([
+        { summary: 'Need region', question: 'Which region?' },
+        { questions: ['Regional evidence?'] },
+        { summary: 'Evidence found', sources: [source] },
+        { summary: 'Covered', gaps: [] },
+        '# Report',
+      ]),
+    );
+    const run = await coordinator.start(chat.id, research);
+    await vi.waitFor(async () => expect((await store.run(run.id)).status).toBe('waiting'), {
+      timeout: 5000,
+    });
+    expect((await store.run(run.id)).reportPath).toBeNull();
+    await coordinator.close();
+    const resumed = new RunCoordinator(store, provider, notify);
+    coordinators.push(resumed);
+    const answers = await Promise.allSettled([
+      resumed.answer(run.id, 'Europe'),
+      resumed.answer(run.id, 'Asia'),
+    ]);
+    expect(answers.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    await vi.waitFor(async () => expect((await store.run(run.id)).status).toBe('completed'), {
+      timeout: 5000,
+    });
+    expect((await store.run(run.id)).harness?.answer).toBe('Europe');
+    expect(vi.mocked(provider.executeTurn).mock.calls[1]?.[0].prompt).toContain('Europe');
+  });
+  it('fails invalid output without leaking raw structured text or starting another stage', async () => {
+    const { coordinator, store, chat, provider } = await fixture(
+      scripted(['invalid stage output']),
+    );
+    const run = await coordinator.start(chat.id, research);
+    await vi.waitFor(async () => expect((await store.run(run.id)).status).toBe('failed'));
+    expect(provider.executeTurn).toHaveBeenCalledTimes(1);
+    expect((await store.run(run.id)).error).toContain('invalid result');
+    expect((await store.chat(chat.id)).messages.at(-1)?.content).not.toContain(
+      'invalid stage output',
+    );
+  });
+  it('stops a waiting run without contacting a provider', async () => {
+    const { coordinator, store, chat, provider } = await fixture(
+      scripted([{ summary: 'Need region', question: 'Which region?' }]),
+    );
+    const run = await coordinator.start(chat.id, research);
+    await vi.waitFor(async () => expect((await store.run(run.id)).status).toBe('waiting'));
+    await coordinator.cancel(run.id);
+    await vi.waitFor(async () => expect((await store.run(run.id)).status).toBe('cancelled'));
+    expect(provider.executeTurn).toHaveBeenCalledTimes(1);
+    await expect(coordinator.answer(run.id, 'Europe')).rejects.toThrow();
+  });
+  it('stops active gathering and never launches review or a report', async () => {
+    const first = scripted([
+      { summary: 'Clear', question: null },
+      { questions: ['Find evidence'] },
+    ]);
+    let count = 0;
+    const { coordinator, store, chat, provider } = await fixture((...args) =>
+      ++count <= 2 ? first(...args) : heldTurn(...args),
+    );
+    const run = await coordinator.start(chat.id, research);
+    await vi.waitFor(async () => expect((await store.run(run.id)).turnId).toBe('turn-a'));
+    await coordinator.cancel(run.id);
+    await vi.waitFor(async () => expect((await store.run(run.id)).status).toBe('cancelled'));
+    expect(provider.executeTurn).toHaveBeenCalledTimes(3);
+    expect((await store.run(run.id)).harness?.stage).toBe('gather');
+    expect((await store.run(run.id)).reportPath).toBeNull();
+  });
+});

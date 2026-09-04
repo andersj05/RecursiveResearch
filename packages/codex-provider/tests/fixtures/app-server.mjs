@@ -157,7 +157,10 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
           },
         });
         if (mode === 'turn-wait') return;
-        const text = `${params.model}/${params.effort}/${thread.config.web_search}: ${params.input[0].text}`;
+        const text =
+          mode === 'structured-output'
+            ? JSON.stringify(params.outputSchema ?? null)
+            : `${params.model}/${params.effort}/${thread.config.web_search}: ${params.input[0].text}`;
         notify('item/agentMessage/delta', {
           threadId,
           turnId,

@@ -184,6 +184,9 @@ export async function createApp(options: AppOptions = {}) {
     const run = await runs.cancel(routeId(request.params));
     return reply.code(202).send(run);
   });
+  app.post('/api/runs/:id/answer', async (request) =>
+    runs.answer(routeId(request.params), createMessageSchema.parse(request.body).content),
+  );
   app.post('/api/runs/:id/steer', async (request) =>
     runs.steer(routeId(request.params), createMessageSchema.parse(request.body).content),
   );

@@ -19,6 +19,7 @@ import {
   messageSchema,
   researchEventSchema,
   runSchema,
+  harnessStateSchema,
   harnessConfigSchema,
   defaultHarnessConfig,
   isActiveRun as activeRun,
@@ -61,6 +62,7 @@ type StoredRun = ProjectDocument['runs'][number];
 export interface ResolvedRunInput extends Omit<StartRunInput, 'model' | 'reasoningEffort'> {
   model: string;
   reasoningEffort: string;
+  harnessState?: Run['harness'];
 }
 
 export interface RunUpdate {
@@ -70,6 +72,7 @@ export interface RunUpdate {
   turnId?: string | null;
   error?: string | null;
   summary?: string;
+  harness?: Run['harness'];
 }
 
 /** EPERM and foreign hosts are not evidence that the owner stopped running. */
@@ -99,7 +102,7 @@ function assertRunOwner(run: StoredRun): void {
 function recoverAbandonedRuns(document: ProjectDocument): number {
   let recovered = 0;
   for (const run of document.runs) {
-    if (!activeRun(run) || !ownerIsDead(run)) continue;
+    if (!activeRun(run) || run.status === 'waiting' || !ownerIsDead(run)) continue;
     const timestamp = now();
     run.status = 'interrupted';
     run.error = 'The server stopped before this run finished. Send a new message to continue.';
@@ -484,7 +487,7 @@ export class WorkspaceStore {
           status: 'queued',
           model: input.model,
           reasoningEffort: input.reasoningEffort,
-          threadId: chat.codexThreadId,
+          threadId: input.harness ? null : chat.codexThreadId,
           turnId: null,
           userMessageId,
           assistantMessageId,
@@ -493,6 +496,7 @@ export class WorkspaceStore {
           completedAt: null,
           error: null,
           reportPath: null,
+          harness: input.harnessState ?? null,
         });
         const content = z.string().trim().min(1).max(50000).parse(input.content);
         if (chat.title === 'New chat' || chat.title === 'New research')
@@ -591,8 +595,10 @@ export class WorkspaceStore {
         assistant.content = messageSchema.shape.content.parse(update.content);
       if (update.threadId !== undefined) {
         run.threadId = update.threadId;
-        chat.codexThreadId = update.threadId;
+        if (!run.harness) chat.codexThreadId = update.threadId;
       }
+      if (update.harness !== undefined)
+        run.harness = harnessStateSchema.nullable().parse(update.harness);
       if (update.turnId !== undefined) run.turnId = update.turnId;
       if (update.error !== undefined) run.error = update.error;
       const timestamp = now();
@@ -601,6 +607,7 @@ export class WorkspaceStore {
       run.updatedAt = timestamp;
       chat.updatedAt = timestamp;
       document.project.updatedAt = timestamp;
+      if (run.status === 'waiting') assistant.status = 'complete';
       if (!activeRun(run)) {
         run.completedAt = timestamp;
         assistant.status =
@@ -614,6 +621,7 @@ export class WorkspaceStore {
       }
       if (changedStatus || update.summary) {
         const statusEvents = {
+          waiting: 'note.added',
           queued: 'run.queued',
           running: 'run.started',
           completed: 'run.completed',
@@ -631,6 +639,52 @@ export class WorkspaceStore {
           createdAt: timestamp,
         });
       }
+      return publicRun(run);
+    });
+  }
+
+  /** Atomically claims a durable clarification; waiting has no live provider owner. */
+  answerHarness(id: string, answer: string): Promise<Run> {
+    return this.mutateRun(id, async (document, run) => {
+      if (run.status !== 'waiting' || !run.harness?.question)
+        throw new AppError(409, 'NOT_WAITING', 'This research is no longer waiting for an answer.');
+      run.owner = { pid: process.pid, host: hostname() };
+      run.harness.answer = z.string().trim().min(1).max(50000).parse(answer);
+      run.harness.stage = 'plan';
+      run.status = 'queued';
+      run.turnId = null;
+      run.updatedAt = now();
+      const assistant = document.messages.find((item) => item.id === run.assistantMessageId);
+      if (assistant) assistant.status = 'streaming';
+      document.messages.push({
+        id: randomUUID(),
+        chatId: run.chatId,
+        runId: run.id,
+        role: 'user',
+        content: answer,
+        status: 'complete',
+        createdAt: now(),
+      });
+      return publicRun(run);
+    });
+  }
+
+  cancelWaitingHarness(id: string): Promise<Run> {
+    return this.mutateRun(id, async (document, run) => {
+      if (run.status !== 'waiting')
+        throw new AppError(409, 'NOT_WAITING', 'Research has already continued.');
+      run.status = 'cancelled';
+      run.completedAt = now();
+      run.updatedAt = now();
+      document.events.push({
+        id: randomUUID(),
+        projectId: run.projectId,
+        chatId: run.chatId,
+        runId: run.id,
+        type: 'run.cancelled',
+        summary: 'Research stopped while waiting for clarification.',
+        createdAt: now(),
+      });
       return publicRun(run);
     });
   }
